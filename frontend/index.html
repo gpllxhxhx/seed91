@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="在线音乐播放器，支持音乐搜索、推荐歌单、新歌、榜单、歌手、专辑、MV 和电台。">
+    <meta name="robots" content="index,follow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Music Player - 在线音乐播放器">
+    <meta property="og:description" content="搜索音乐、发现歌单、查看榜单并在线聆听。">
+    <title>Music Player - 在线音乐播放器</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/lucide.min.js"></script>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1 class="logo"><i data-lucide="music-4"></i><span>Music Player</span></h1>
+            <div class="api-status" id="api-status">API 未连接</div>
+        </div>
+        <nav class="sidebar-nav" aria-label="主导航">
+            <a href="#" class="nav-item active" data-page="home">
+                <i data-lucide="sparkles"></i> <span>现在聆听</span>
+            </a>
+            <a href="#" class="nav-item" data-page="search">
+                <i data-lucide="search"></i> <span>搜索</span>
+            </a>
+            <a href="#" class="nav-item" data-page="playlists">
+                <i data-lucide="library"></i> <span>资料库</span>
+            </a>
+            <a href="#" class="nav-item" data-page="import">
+                <i data-lucide="arrow-down-to-line"></i> <span>导入</span>
+            </a>
+            <a href="#" class="nav-item" data-page="desktop">
+                <i data-lucide="monitor-down"></i> <span>桌面版</span>
+            </a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <section class="page active" id="page-home">
+            <div class="page-hero header-row">
+                <div>
+                    <p class="eyebrow">Netease Enhanced</p>
+                    <h2>现在聆听</h2>
+                    <p class="subtitle">推荐、榜单和新歌都在这里。</p>
+                </div>
+                <button class="btn btn-outline" id="btn-refresh-discover"><i data-lucide="refresh-cw"></i> 刷新内容</button>
+            </div>
+
+            <div class="home-top-grid">
+                <div class="banner-strip" id="banner-strip"></div>
+
+                <section class="section-block hot-search-panel">
+                    <div class="section-title">
+                        <h3>热搜</h3>
+                        <span>Trending</span>
+                    </div>
+                    <div class="chip-row" id="hot-search-list"></div>
+                </section>
+            </div>
+
+            <section class="section-block">
+                <div class="section-title">
+                    <h3>推荐歌单</h3>
+                    <div class="section-title-actions">
+                        <span>Made for the moment</span>
+                        <button type="button" class="section-more" data-more-section="playlists">查看更多</button>
+                    </div>
+                </div>
+                <div class="card-grid" id="discover-playlists"></div>
+            </section>
+
+            <section class="section-block">
+                <div class="section-title">
+                    <h3>新歌推荐</h3>
+                    <div class="section-title-actions">
+                        <span>Fresh tracks</span>
+                        <button type="button" class="section-more" data-more-section="songs">查看更多</button>
+                    </div>
+                </div>
+                <div class="song-list" id="discover-songs"></div>
+            </section>
+
+            <section class="section-block two-column">
+                <div class="panel-section">
+                    <div class="section-title">
+                        <h3>榜单</h3>
+                        <div class="section-title-actions">
+                            <span>Charts</span>
+                            <button type="button" class="section-more" data-more-section="toplists">查看更多</button>
+                        </div>
+                    </div>
+                    <div class="compact-list" id="discover-toplists"></div>
+                </div>
+                <div class="panel-section">
+                    <div class="section-title">
+                        <h3>热门歌手</h3>
+                        <div class="section-title-actions">
+                            <span>Artists</span>
+                            <button type="button" class="section-more" data-more-section="artists">查看更多</button>
+                        </div>
+                    </div>
+                    <div class="compact-list" id="discover-artists"></div>
+                </div>
+            </section>
+
+            <section class="section-block two-column">
+                <div class="panel-section">
+                    <div class="section-title">
+                        <h3>最新专辑</h3>
+                        <div class="section-title-actions">
+                            <span>Albums</span>
+                            <button type="button" class="section-more" data-more-section="albums">查看更多</button>
+                        </div>
+                    </div>
+                    <div class="compact-list" id="discover-albums"></div>
+                </div>
+                <div class="panel-section">
+                    <div class="section-title">
+                        <h3>推荐 MV</h3>
+                        <div class="section-title-actions">
+                            <span>Video</span>
+                            <button type="button" class="section-more" data-more-section="mvs">查看更多</button>
+                        </div>
+                    </div>
+                    <div class="compact-list" id="discover-mvs"></div>
+                </div>
+            </section>
+
+            <section class="section-block">
+                <div class="section-title">
+                    <h3>热门电台</h3>
+                    <div class="section-title-actions">
+                        <span>Radio</span>
+                        <button type="button" class="section-more" data-more-section="djs">查看更多</button>
+                    </div>
+                </div>
+                <div class="card-grid" id="discover-djs"></div>
+            </section>
+        </section>
+
+        <section class="page" id="page-search">
+            <div class="page-hero">
+                <p class="eyebrow">Search</p>
+                <h2>搜索音乐</h2>
+                <p class="subtitle">探索单曲、专辑、歌手、歌单、MV、视频和电台。</p>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="输入歌曲、歌手、专辑、歌单或视频关键词" />
+                <select id="search-type" aria-label="搜索类型">
+                    <option value="song">单曲</option>
+                    <option value="album">专辑</option>
+                    <option value="artist">歌手</option>
+                    <option value="playlist">歌单</option>
+                    <option value="mv">MV</option>
+                    <option value="video">视频</option>
+                    <option value="dj">电台</option>
+                </select>
+                <button class="btn btn-primary" id="btn-search"><i data-lucide="search"></i> 搜索</button>
+            </div>
+            <div class="tab-row" id="search-tabs">
+                <button class="tab active" data-search-type="song">单曲</button>
+                <button class="tab" data-search-type="album">专辑</button>
+                <button class="tab" data-search-type="artist">歌手</button>
+                <button class="tab" data-search-type="playlist">歌单</button>
+                <button class="tab" data-search-type="mv">MV</button>
+                <button class="tab" data-search-type="video">视频</button>
+                <button class="tab" data-search-type="dj">电台</button>
+            </div>
+            <div class="search-results">
+                <div id="search-results-container"></div>
+                <div id="search-empty" class="empty-state">
+                    <p>输入关键词开始搜索</p>
+                </div>
+                <div id="search-no-result" class="empty-state hidden">
+                    <p>没有找到相关内容</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="page" id="page-playlists">
+            <div class="page-hero header-row">
+                <div>
+                    <p class="eyebrow">Library</p>
+                    <h2>本地资料库</h2>
+                    <p class="subtitle">当前浏览器里的歌单。</p>
+                </div>
+                <button class="btn btn-primary" id="btn-create-playlist"><i data-lucide="plus"></i> 新建歌单</button>
+            </div>
+            <div class="card-grid" id="playlist-grid"></div>
+            <div id="playlist-empty" class="empty-state hidden">
+                <p>还没有歌单</p>
+                <p class="subtitle">新建一个歌单，或从网易云歌单链接导入。</p>
+            </div>
+        </section>
+
+        <section class="page" id="page-playlist-detail">
+            <button class="btn btn-back" id="btn-back-playlists"><i data-lucide="arrow-left"></i> 返回资料库</button>
+            <div class="detail-hero">
+                <img id="detail-cover" class="detail-cover" src="" alt="">
+                <div class="detail-meta">
+                    <div class="detail-label" id="detail-source">本地歌单</div>
+                    <h2 id="detail-name"></h2>
+                    <p id="detail-desc"></p>
+                    <p id="detail-meta-text"></p>
+                    <div class="detail-actions">
+                        <button class="btn btn-primary" id="btn-play-all"><i data-lucide="play"></i> 播放全部</button>
+                        <button class="btn btn-outline" id="btn-refresh-playlist"><i data-lucide="refresh-cw"></i> 刷新缓存</button>
+                        <button class="btn btn-danger-outline" id="btn-delete-playlist"><i data-lucide="trash-2"></i> 删除歌单</button>
+                    </div>
+                </div>
+            </div>
+            <div class="song-list" id="detail-song-list"></div>
+            <div id="detail-empty" class="empty-state hidden">
+                <p>歌单里还没有歌曲</p>
+            </div>
+        </section>
+
+        <section class="page" id="page-entity-detail">
+            <button class="btn btn-back" id="btn-back-entity"><i data-lucide="arrow-left"></i> 返回</button>
+            <div class="detail-hero">
+                <img id="entity-cover" class="detail-cover" src="" alt="">
+                <div class="detail-meta">
+                    <div class="detail-label" id="entity-label"></div>
+                    <h2 id="entity-title"></h2>
+                    <p id="entity-subtitle"></p>
+                    <p id="entity-description"></p>
+                    <div class="detail-actions" id="entity-actions"></div>
+                </div>
+            </div>
+            <div id="entity-media-player" class="media-player hidden"></div>
+            <div id="entity-content"></div>
+        </section>
+
+        <section class="page" id="page-current-song-detail">
+            <button class="btn btn-back" id="btn-back-current-song"><i data-lucide="chevron-down"></i> <span>收起</span></button>
+            <div class="current-song-detail">
+                <div class="current-song-stage">
+                    <div class="tonearm" aria-hidden="true">
+                        <svg class="tonearm-svg" viewBox="0 0 300 190" focusable="false">
+                            <circle class="tonearm-pivot-shadow" cx="46" cy="32" r="24"></circle>
+                            <circle class="tonearm-pivot" cx="46" cy="32" r="13"></circle>
+                            <circle class="tonearm-pivot-dot" cx="46" cy="32" r="5"></circle>
+                            <path class="tonearm-path" d="M58 45 C82 78 118 116 158 130 C188 140 218 143 246 145"></path>
+                            <path class="tonearm-highlight" d="M59 45 C83 76 119 113 158 127 C188 137 219 140 246 142"></path>
+                            <rect class="tonearm-head" x="235" y="134" width="42" height="24" rx="5" transform="rotate(5 256 146)"></rect>
+                            <rect class="tonearm-needle" x="224" y="137" width="23" height="9" rx="3" transform="rotate(5 236 142)"></rect>
+                        </svg>
+                    </div>
+                    <button class="current-song-visual" id="current-song-visual" type="button" title="切换封面/歌词">
+                        <img id="current-song-cover-large" class="current-song-cover-large artwork-empty" alt="">
+                        <div class="current-song-lyrics-layer" id="current-song-lyrics-layer">
+                            <div class="current-song-lyrics-top">
+                                <i data-lucide="captions"></i>
+                                <span id="current-song-lyrics-status">暂无歌词</span>
+                            </div>
+                            <div class="current-song-lyrics-body" id="current-song-lyrics-body">
+                                <div class="lyrics-line active">未在播放</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                <div class="current-song-meta">
+                    <div class="detail-label">正在播放</div>
+                    <h2 id="current-song-title">未在播放</h2>
+                    <p id="current-song-artist"></p>
+                    <p id="current-song-album"></p>
+                    <div class="current-song-lyrics-strip">
+                        <div class="current-song-lyrics-strip-body" id="current-song-lyrics-strip-body">
+                            <div class="lyrics-line active">未在播放</div>
+                        </div>
+                    </div>
+                    <div class="detail-actions">
+                        <button class="btn btn-primary" id="btn-current-song-play"><i data-lucide="play" id="icon-current-song-play"></i> 播放/暂停</button>
+                        <button class="btn btn-outline" id="btn-current-song-toggle-lyrics"><i data-lucide="captions"></i> 歌词</button>
+                        <button class="btn btn-outline" id="btn-current-song-add"><i data-lucide="plus-circle"></i> 添加到歌单</button>
+                    </div>
+                    <div class="current-song-lyric-current" id="current-song-lyric-current"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="page" id="page-import">
+            <div class="page-hero">
+                <p class="eyebrow">Import</p>
+                <h2>导入音乐</h2>
+                <p class="subtitle">保存歌单或单曲到资料库。</p>
+            </div>
+            <div class="import-section">
+                <div class="import-card">
+                    <h3>导入歌单</h3>
+                    <p>支持歌单链接或直接输入歌单 ID。</p>
+                    <div class="import-input-row">
+                        <input type="text" id="import-playlist-url" placeholder="https://music.163.com/playlist?id=123456" />
+                        <button class="btn btn-primary" id="btn-import-playlist"><i data-lucide="arrow-down-to-line"></i> 导入</button>
+                    </div>
+                    <div id="import-playlist-status" class="import-status hidden"></div>
+                </div>
+                <div class="import-card">
+                    <h3>导入单曲</h3>
+                    <p>支持歌曲链接或直接输入歌曲 ID。</p>
+                    <div class="import-input-row">
+                        <input type="text" id="import-song-url" placeholder="https://music.163.com/song?id=123456" />
+                        <button class="btn btn-primary" id="btn-import-song"><i data-lucide="arrow-down-to-line"></i> 导入</button>
+                    </div>
+                    <div id="import-song-status" class="import-status hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="page" id="page-desktop">
+            <div class="page-hero">
+                <p class="eyebrow">Desktop</p>
+                <h2>桌面版下载</h2>
+                <p class="subtitle">安装后可直接打开独立播放器窗口。</p>
+            </div>
+            <div class="desktop-download-panel">
+                <div class="desktop-download-info">
+                    <h3>Windows x64 安装包</h3>
+                    <p id="desktop-version-summary">正在读取版本信息...</p>
+                    <p class="desktop-risk-note">当前安装包未做代码签名，Windows SmartScreen 可能提示风险。正式发布前建议购买代码签名证书。</p>
+                </div>
+                <div class="desktop-download-actions">
+                    <a class="btn btn-primary desktop-download-link disabled" id="desktop-download-link" href="#" download>
+                        <i data-lucide="download"></i> 下载桌面版
+                    </a>
+                    <button class="btn btn-outline" id="btn-refresh-desktop-version" type="button">
+                        <i data-lucide="refresh-cw"></i> 刷新版本
+                    </button>
+                </div>
+                <div class="desktop-version-details" id="desktop-version-details"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="player-bar" id="player-bar">
+        <button class="player-left player-now-entry" id="player-current-entry" type="button" title="歌曲详情">
+            <img id="player-cover" class="player-cover artwork-empty" alt="">
+            <div class="player-info">
+                <div class="player-title" id="player-title"><span id="player-title-text">未在播放</span></div>
+                <div class="player-artist" id="player-artist"></div>
+            </div>
+        </button>
+        <div class="player-center">
+            <div class="player-controls">
+                <button class="player-btn" id="btn-prev" title="上一首"><i data-lucide="skip-back"></i></button>
+                <button class="player-btn player-btn-play" id="btn-play-pause" title="播放/暂停"><i data-lucide="play" id="icon-play-pause"></i></button>
+                <button class="player-btn" id="btn-next" title="下一首"><i data-lucide="skip-forward"></i></button>
+            </div>
+            <div class="player-progress">
+                <span id="player-current-time">00:00</span>
+                <input type="range" id="player-progress-bar" min="0" max="100" value="0" step="0.1">
+                <span id="player-duration">00:00</span>
+            </div>
+            <audio id="audio-player" preload="auto"></audio>
+        </div>
+        <div class="player-right">
+            <div class="player-volume">
+                <button class="player-btn player-volume-toggle" id="btn-toggle-mute" type="button" title="静音">
+                    <i data-lucide="volume-2" id="icon-volume"></i>
+                </button>
+                <input type="range" id="player-volume" min="0" max="100" value="80">
+            </div>
+            <div class="player-quality">
+                <select id="player-quality-select" title="解灰音源策略">
+                    <option value="quality" selected>音质优先</option>
+                    <option value="stable">稳定优先</option>
+                </select>
+            </div>
+            <button class="player-btn" id="btn-toggle-comments" title="评论"><i data-lucide="message-circle"></i></button>
+            <button class="player-btn player-add-playlist-btn" id="btn-add-current-to-playlist" title="添加到歌单" aria-label="添加到歌单" disabled><i data-lucide="package-plus"></i></button>
+            <button class="player-btn" id="btn-play-mode" title="列表循环"><i data-lucide="repeat" id="icon-play-mode"></i></button>
+            <button class="player-btn" id="btn-toggle-playlist" title="播放队列"><i data-lucide="list-music"></i></button>
+        </div>
+    </footer>
+
+    <div class="comments-panel hidden" id="comments-panel">
+        <div class="comments-panel-header">
+            <h3>歌曲评论</h3>
+            <span id="comments-status">暂无评论</span>
+        </div>
+        <div class="comments-panel-body" id="comments-panel-body">
+            <div class="comments-empty">未在播放</div>
+        </div>
+    </div>
+
+    <div class="queue-panel hidden" id="queue-panel">
+        <div class="queue-header">
+            <div>
+                <h3>播放队列</h3>
+                <span id="queue-count">0 首</span>
+            </div>
+            <button class="queue-locate-btn" id="btn-locate-current-song" type="button" title="定位正在播放">
+                <i data-lucide="crosshair"></i>
+                <span>逮住这首</span>
+            </button>
+        </div>
+        <div class="queue-list" id="queue-list"></div>
+    </div>
+
+    <div class="modal-overlay hidden" id="modal-create-playlist">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>新建歌单</h3>
+                <button class="btn-close" id="btn-close-modal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <label for="input-playlist-name">歌单名称</label>
+                <input type="text" id="input-playlist-name" placeholder="输入歌单名称" />
+                <label for="input-playlist-desc">描述</label>
+                <input type="text" id="input-playlist-desc" placeholder="可选" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-create">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-create">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="modal-pick-playlist">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="pick-playlist-title">选择歌单</h3>
+                <button class="btn-close" id="btn-close-pick-playlist"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" id="pick-playlist-body">
+                <div id="pick-playlist-loading" class="empty-state">
+                    <p>正在加载歌单...</p>
+                </div>
+                <div id="pick-playlist-empty" class="empty-state hidden">
+                    <p>还没有歌单</p>
+                    <button class="btn btn-primary" id="btn-pick-create-playlist">
+                        <i data-lucide="plus"></i> 创建歌单
+                    </button>
+                </div>
+                <div id="pick-playlist-list" class="pick-playlist-list hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="modal-quick-create-playlist">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>创建歌单并导入</h3>
+                <button class="btn-close" id="btn-close-quick-create"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <label for="input-quick-playlist-name">歌单名称</label>
+                <input type="text" id="input-quick-playlist-name" placeholder="输入歌单名称" />
+                <label for="input-quick-playlist-desc">描述</label>
+                <input type="text" id="input-quick-playlist-desc" placeholder="可选" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-quick-create">取消</button>
+                <button class="btn btn-primary" id="btn-confirm-quick-create">创建并导入</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="modal-confirm">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="confirm-title">确认操作</h3>
+                <button class="btn-close" id="btn-close-confirm"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-confirm">取消</button>
+                <button class="btn btn-danger-outline" id="btn-confirm-action">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

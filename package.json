@@ -1,0 +1,72 @@
+{
+  "name": "music-pet-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static music web client for NeteaseCloudMusicApiEnhanced.",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "node app.js",
+    "frontend": "node app.js",
+    "api": "node scripts/start-api-enhanced.cjs",
+    "desktop:dev": "node scripts/desktop-dev.cjs",
+    "desktop:build": "electron-builder --win nsis --x64",
+    "desktop:installer": "npm run desktop:build",
+    "desktop:publish-local": "node scripts/publish-desktop.cjs",
+    "deploy:start": "pm2 start ecosystem.config.cjs",
+    "deploy:reload": "pm2 reload ecosystem.config.cjs --update-env",
+    "deploy:logs": "pm2 logs music-web music-api"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.musicpet.desktop",
+    "productName": "Music Pet",
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app.js",
+      "desktop/**/*",
+      "frontend/**/*",
+      "!frontend/downloads/*.exe",
+      "!NeteaseCloudMusicApiEnhanced/precompiled/**/*",
+      "!NeteaseCloudMusicApiEnhanced/test/**/*",
+      "!NeteaseCloudMusicApiEnhanced/.git/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "NeteaseCloudMusicApiEnhanced",
+        "to": "NeteaseCloudMusicApiEnhanced",
+        "filter": [
+          "**/*",
+          "!precompiled/**/*",
+          "!test/**/*",
+          "!.git/**/*"
+        ]
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "MusicPet-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Music Pet"
+    }
+  }
+}

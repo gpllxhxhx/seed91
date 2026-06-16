@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music Pet</title>
+  <link rel="stylesheet" href="./PetView.css">
+</head>
+<body>
+  <main class="pet-shell" id="pet-shell" title="单击播放/暂停，双击打开播放器">
+    <div class="pet-shadow"></div>
+    <button class="pet" id="pet-button" type="button" aria-label="音乐桌宠">
+      <div class="pet-ear pet-ear-left"></div>
+      <div class="pet-ear pet-ear-right"></div>
+      <div class="pet-face">
+        <div class="pet-eye"></div>
+        <div class="pet-eye"></div>
+        <div class="pet-mouth"></div>
+      </div>
+      <div class="pet-note" aria-hidden="true">♪</div>
+    </button>
+    <div class="pet-status" id="pet-status">空闲</div>
+  </main>
+  <script src="./PetView.js"></script>
+</body>
+</html>

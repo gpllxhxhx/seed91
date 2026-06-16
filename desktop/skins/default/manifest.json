@@ -1,0 +1,13 @@
+{
+  "name": "Default Pet",
+  "version": "1.0.0",
+  "width": 260,
+  "height": 320,
+  "animations": {
+    "idle": "css",
+    "playing": "css",
+    "paused": "css",
+    "next": "css",
+    "error": "css"
+  }
+}

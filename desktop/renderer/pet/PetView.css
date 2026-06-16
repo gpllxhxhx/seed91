@@ -1,0 +1,160 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  user-select: none;
+}
+
+.pet-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  -webkit-app-region: drag;
+}
+
+.pet {
+  position: relative;
+  width: 190px;
+  height: 214px;
+  border: 0;
+  border-radius: 45% 45% 38% 38%;
+  background: radial-gradient(circle at 35% 28%, #fff8f0 0 16%, #ffd76f 17% 42%, #f06d5e 80%);
+  box-shadow: inset -14px -18px 0 rgba(121, 31, 50, .16), 0 18px 40px rgba(20, 8, 10, .28);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transform-origin: 50% 88%;
+}
+
+.pet-shell.playing .pet {
+  animation: pet-bounce 760ms ease-in-out infinite;
+}
+
+.pet-shell.loading .pet {
+  animation: pet-wiggle 520ms ease-in-out infinite;
+}
+
+.pet-shell.paused .pet {
+  filter: saturate(.82);
+}
+
+.pet-shell.error .pet {
+  background: radial-gradient(circle at 35% 28%, #fff7f7 0 16%, #ff9aa8 17% 45%, #7b2334 82%);
+  animation: pet-shake 460ms ease-in-out 2;
+}
+
+.pet-ear {
+  position: absolute;
+  top: 18px;
+  width: 50px;
+  height: 58px;
+  border-radius: 56% 56% 30% 30%;
+  background: #8f3854;
+  z-index: -1;
+}
+
+.pet-ear-left {
+  left: 24px;
+  transform: rotate(-24deg);
+}
+
+.pet-ear-right {
+  right: 24px;
+  transform: rotate(24deg);
+}
+
+.pet-face {
+  position: absolute;
+  left: 33px;
+  right: 33px;
+  top: 78px;
+  height: 82px;
+  border-radius: 36px;
+  background: rgba(255, 255, 255, .72);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  place-items: center;
+}
+
+.pet-eye {
+  width: 18px;
+  height: 23px;
+  border-radius: 50%;
+  background: #261820;
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, .35);
+}
+
+.pet-mouth {
+  position: absolute;
+  bottom: 18px;
+  width: 28px;
+  height: 14px;
+  border-bottom: 4px solid #4c2630;
+  border-radius: 0 0 24px 24px;
+}
+
+.pet-note {
+  position: absolute;
+  right: 22px;
+  top: 38px;
+  color: #fff;
+  font-size: 36px;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(57, 17, 33, .35);
+}
+
+.pet-shell.playing .pet-note {
+  animation: note-float 1.2s ease-in-out infinite;
+}
+
+.pet-shadow {
+  position: absolute;
+  bottom: 34px;
+  width: 158px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .18);
+  filter: blur(6px);
+}
+
+.pet-status {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 10px;
+  height: 28px;
+  line-height: 28px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  background: rgba(24, 18, 22, .46);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+  -webkit-app-region: no-drag;
+}
+
+@keyframes pet-bounce {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-9px) rotate(1deg); }
+}
+
+@keyframes pet-wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes pet-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes note-float {
+  0%, 100% { transform: translateY(0); opacity: .75; }
+  50% { transform: translateY(-12px); opacity: 1; }
+}

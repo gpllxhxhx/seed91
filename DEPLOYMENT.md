@@ -1,0 +1,114 @@
+# 上线发布说明
+
+这个项目分为两部分：
+
+- `frontend/`：用户看到的网页，可以放到静态网站平台。
+- `NeteaseCloudMusicApiEnhanced/`：网页依赖的音乐 API，需要部署成公网后端服务。
+
+只上传 `frontend/` 也能打开页面，但如果不部署 API，别人访问时无法正常搜索和播放音乐。
+
+如果你要部署到自己的云服务器，优先阅读：
+
+```text
+deploy/README.md
+```
+
+项目已经包含：
+
+- `ecosystem.config.cjs`：PM2 常驻运行前端和 API。
+- `deploy/nginx/music-site.conf.example`：Nginx 公网访问模板。
+- `deploy/scripts/setup-ubuntu.sh`：Ubuntu 服务器基础环境安装脚本。
+- `deploy/scripts/check-public-site.sh`：上线后的公网检查脚本。
+
+## 推荐上线流程
+
+1. 先部署后端 API
+
+   把 `NeteaseCloudMusicApiEnhanced/` 作为 Node.js 服务部署到支持 Node 的平台。启动命令：
+
+   ```bash
+   npm install
+   npm start
+   ```
+
+   服务默认监听平台提供的 `PORT`。部署完成后，你会得到一个公网地址，例如：
+
+   ```text
+   https://api.your-domain.com
+   ```
+
+2. 配置前端 API 地址
+
+   打开 `frontend/js/config.js`，把地址改成你的后端公网地址：
+
+   ```js
+   window.NCM_API_BASE = 'https://api.your-domain.com';
+   ```
+
+3. 部署前端网页
+
+   把 `frontend/` 目录上传到静态网站平台。发布目录选择：
+
+   ```text
+   frontend
+   ```
+
+   入口文件是：
+
+   ```text
+   index.html
+   ```
+
+4. 绑定域名
+
+   给前端绑定一个正式域名，例如：
+
+   ```text
+   https://music.your-domain.com
+   ```
+
+5. 更新站点地图
+
+   打开 `frontend/sitemap.xml`，把：
+
+   ```text
+   https://your-domain.example/
+   ```
+
+   改成你的真实网站首页地址。
+
+6. 让搜索引擎收录
+
+   网站上线并能公网访问后，把域名提交到搜索引擎站长平台，并提交：
+
+   ```text
+   https://你的域名/sitemap.xml
+   ```
+
+   通常需要几天到几周才会被搜索到。搜索引擎是否收录，还取决于网站内容质量、访问稳定性、是否有其他网站链接到你的网站。
+
+## 本地测试
+
+前端本地启动：
+
+```bash
+npm start
+```
+
+API 本地启动：
+
+```bash
+npm run api
+```
+
+本地访问：
+
+```text
+http://localhost:8000
+```
+
+## 注意
+
+- 如果前端是 `https`，API 也必须是 `https`，否则浏览器会拦截请求。
+- `frontend/js/config.js` 里的地址不要保留 `localhost`，线上用户无法访问你电脑上的本地服务。
+- 如果网站主要面向中国大陆用户，域名和服务器可能还涉及备案要求。
