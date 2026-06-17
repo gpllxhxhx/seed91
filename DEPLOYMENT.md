@@ -27,11 +27,14 @@ deploy/README.md
    把 `NeteaseCloudMusicApiEnhanced/` 作为 Node.js 服务部署到支持 Node 的平台。启动命令：
 
    ```bash
-   npm install
+   cd NeteaseCloudMusicApiEnhanced
+   npm install --omit=dev
    npm start
    ```
 
    服务默认监听平台提供的 `PORT`。如果你按仓库里的 PM2 和 Nginx 模板部署，后端只需要在服务器本机运行，不需要单独对外暴露域名。
+
+   生产环境安装会自动跳过 `husky` 这类开发钩子，不需要额外安装开发依赖。
 
 2. 配置前端 API 地址
 
@@ -102,6 +105,27 @@ npm run api
 ```text
 http://localhost:8000
 ```
+
+## 服务器更新代码
+
+如果服务器目录类似 `/www/wwwroot/music-backend/app`，更新流程推荐固定为：
+
+```bash
+cd /www/wwwroot/music-backend/app
+git fetch origin
+git checkout main
+git pull origin main
+
+cd /www/wwwroot/music-backend/app/NeteaseCloudMusicApiEnhanced
+npm install --omit=dev
+
+cd /www/wwwroot/music-backend/app
+pm2 reload ecosystem.config.cjs --update-env
+pm2 status
+pm2 logs music-api --lines 50
+```
+
+最后重点确认 `music-api` 处于 `online` 状态，且日志里没有依赖缺失或启动报错。
 
 ## 注意
 

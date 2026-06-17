@@ -37,6 +37,8 @@ npm install --omit=dev
 
 根目录前端服务不需要额外依赖。
 
+生产环境安装会自动跳过 `husky` 这类只用于本地开发的 Git 钩子，不需要额外安装开发依赖。
+
 ## 4. 填写你的域名
 
 假设你使用：
@@ -91,6 +93,12 @@ pm2 status
 
 ```bash
 npm run deploy:logs
+```
+
+如果只想快速确认 API 是否正常，也可以单独看：
+
+```bash
+pm2 logs music-api --lines 50
 ```
 
 ## 6. 配置 Nginx
@@ -166,3 +174,24 @@ https://music.your-domain.com/sitemap.xml
 ```
 
 收录通常需要几天到几周。
+
+## 11. 后续更新代码
+
+以后服务器拉取 GitHub 最新代码时，推荐固定执行：
+
+```bash
+cd /var/www/music-backend/app
+git fetch origin
+git checkout main
+git pull origin main
+
+cd /var/www/music-backend/app/NeteaseCloudMusicApiEnhanced
+npm install --omit=dev
+
+cd /var/www/music-backend/app
+pm2 reload ecosystem.config.cjs --update-env
+pm2 status
+pm2 logs music-api --lines 50
+```
+
+确认 `music-web` 和 `music-api` 都是 `online` 后，再做公网访问检查。
