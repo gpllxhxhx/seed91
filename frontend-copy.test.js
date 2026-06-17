@@ -22,7 +22,7 @@ function loadCopyAlias() {
     vm.runInNewContext(`${source}\n;globalThis.__COPY_ALIAS__ = FrontendCopyAlias;`, context, {
         filename: 'frontend/js/copy-alias.js',
     });
-    return context.__COPY_ALIAS__;
+    return context;
 }
 
 test('frontend copy removes 网易云 and rewrites 解灰 to 音源补全', () => {
@@ -34,8 +34,15 @@ test('frontend copy removes 网易云 and rewrites 解灰 to 音源补全', () =
 });
 
 test('dynamic frontend strings are sanitized before rendering', () => {
-    const copyAlias = loadCopyAlias();
+    const context = loadCopyAlias();
+    const copyAlias = context.__COPY_ALIAS__;
 
     assert.equal(copyAlias.sanitizeVisibleCopy('网易云古典榜'), '古典榜');
     assert.equal(copyAlias.sanitizeVisibleCopy('增强解灰 quality'), '增强音源补全 quality');
+});
+
+test('copy alias helper is exposed on window for browser scripts', () => {
+    const context = loadCopyAlias();
+
+    assert.equal(typeof context.window.FrontendCopyAlias?.sanitizeVisibleCopy, 'function');
 });

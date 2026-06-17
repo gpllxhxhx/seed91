@@ -11,3 +11,11 @@ const FrontendCopyAlias = {
             .trim();
     },
 };
+
+if (typeof window !== 'undefined') {
+    window.FrontendCopyAlias = FrontendCopyAlias;
+}
+
+if (typeof globalThis !== 'undefined') {
+    globalThis.FrontendCopyAlias = FrontendCopyAlias;
+}
