@@ -626,7 +626,7 @@ async function loadPlaylists() {
                 name: playlist.name,
                 coverUrl: playlist.coverUrl,
                 trackCount: playlist.trackCount,
-                creatorName: playlist.source === 'netease' ? '网易云导入' : '本地',
+                creatorName: playlist.source === 'netease' ? '链接导入' : '本地',
             }, 'local-playlist')).join('');
             bindEntityCards(container);
         } else {
@@ -653,7 +653,7 @@ async function openPlaylistDetail(playlistId) {
 
 function renderPlaylistDetail(playlist, editable) {
     const songs = playlist.tracks || playlist.songs || [];
-    document.getElementById('detail-source').textContent = playlist.source === 'netease' ? '网易云导入歌单' : '本地歌单';
+    document.getElementById('detail-source').textContent = playlist.source === 'netease' ? '导入歌单' : '本地歌单';
     document.getElementById('detail-name').textContent = playlist.name || '未命名歌单';
     document.getElementById('detail-desc').textContent = playlist.description || '';
     document.getElementById('detail-meta-text').textContent = `${songs.length} 首歌曲 · ${formatCount(playlist.playCount || 0)} 次播放`;
@@ -731,7 +731,7 @@ function setEntityHeader({ label, title, subtitle, description, coverUrl, action
 async function openNeteasePlaylist(id) {
     const playlist = await API.getNeteasePlaylistDetail(id);
     setEntityHeader({
-        label: '网易云歌单',
+        label: '导入歌单',
         title: playlist.name,
         subtitle: `${playlist.tracks.length} 首歌曲 · ${formatCount(playlist.playCount)} 次播放`,
         description: playlist.description,

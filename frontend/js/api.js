@@ -213,7 +213,7 @@ async function request(path, params = {}) {
         return body;
     } catch (err) {
         if (err.name === 'TypeError' || String(err.message).includes('Failed to fetch')) {
-            throw new Error(`无法连接网易云 API 后端：${NCM_API_BASE}`);
+            throw new Error(`无法连接 API 后端：${NCM_API_BASE}`);
         }
         throw err;
     }
@@ -260,7 +260,7 @@ function getOfficialLevels(level = 'quality') {
 }
 
 function assertApiConfigured() {
-    if (!NCM_API_BASE) throw new Error('未配置网易云 API 地址，请先设置 window.NCM_API_BASE');
+    if (!NCM_API_BASE) throw new Error('未配置 API 地址，请先设置 window.NCM_API_BASE');
 }
 
 function appendDesktopToken(url) {
@@ -402,46 +402,46 @@ const api = {
         for (const level of levels) {
             try {
                 const data = await request('/song/url/v1', { id: songId, level, unblock: 'true' });
-                if (isTrialAudioResponse(data)) throw new Error(`增强解灰 ${level} 返回的是试听地址`);
+                if (isTrialAudioResponse(data)) throw new Error(`增强音源补全 ${level} 返回的是试听地址`);
                 const item = getPlayableAudioItem(data);
                 const url = appendDesktopToken(item?.proxyUrl || item?.url || extractAudioUrl(data));
-                if (!url) throw new Error(`增强解灰 ${level} 未返回播放地址`);
+                if (!url) throw new Error(`增强音源补全 ${level} 未返回播放地址`);
                 return {
                     song_id: String(songId),
                     audio_url: url,
                     url,
                     level: item?.level || level,
-                    source: `增强解灰 ${level}`,
+                    source: `增强音源补全 ${level}`,
                     sourceIndex: -1,
                     sourceCount: 0,
                     raw: data,
                 };
             } catch (err) {
-                errors.push(err.message || `增强解灰 ${level} 获取失败`);
+                errors.push(err.message || `增强音源补全 ${level} 获取失败`);
             }
         }
 
-        throw new Error(errors.join('；') || '增强解灰播放地址获取失败');
+        throw new Error(errors.join('；') || '增强音源补全播放地址获取失败');
     },
 
     async getMatchedAudio(songId, preferredLevel = 'quality') {
         try {
             const data = await request('/song/url/match', { id: songId });
-            if (isTrialAudioResponse(data)) throw new Error('匹配解灰返回的是试听地址');
+            if (isTrialAudioResponse(data)) throw new Error('匹配音源补全返回的是试听地址');
             const url = appendDesktopToken(extractAudioUrl(data));
-            if (!url) throw new Error('匹配解灰未返回播放地址');
+            if (!url) throw new Error('匹配音源补全未返回播放地址');
             return {
                 song_id: String(songId),
                 audio_url: url,
                 url,
                 level: preferredLevel,
-                source: '匹配解灰',
+                source: '匹配音源补全',
                 sourceIndex: -1,
                 sourceCount: 0,
                 raw: data,
             };
         } catch (err) {
-            throw new Error(err.message || '匹配解灰获取失败');
+            throw new Error(err.message || '匹配音源补全获取失败');
         }
     },
 
@@ -451,13 +451,13 @@ const api = {
         try {
             return await this.getEnhancedUnblockedAudio(songId, level);
         } catch (err) {
-            errors.push(err.message || '增强解灰播放地址获取失败');
+            errors.push(err.message || '增强音源补全播放地址获取失败');
         }
 
         try {
             return await this.getMatchedAudio(songId, level);
         } catch (err) {
-            errors.push(err.message || '匹配解灰播放地址获取失败');
+            errors.push(err.message || '匹配音源补全播放地址获取失败');
         }
 
         try {
@@ -615,7 +615,7 @@ const api = {
         const audio = await this.getSongAudioUrl(songId);
         return {
             song_id: String(songId),
-            qualities: [{ level: 'unblock', label: '解灰源决定', available: Boolean(audio.audio_url) }],
+            qualities: [{ level: 'unblock', label: '音源补全决定', available: Boolean(audio.audio_url) }],
             recommended: 'unblock',
         };
     },
