@@ -519,7 +519,7 @@ const Player = {
     setPlayerStatus(status) {
         const artistEl = document.getElementById('player-artist');
         if (!artistEl) return;
-        artistEl.textContent = status || this._getArtistText(this.currentSong);
+        artistEl.textContent = this.sanitizeVisibleCopy(status || this._getArtistText(this.currentSong));
     },
 
     setCurrentSongUI(song) {
@@ -528,12 +528,12 @@ const Player = {
         const artistEl = document.getElementById('player-artist');
         const coverEl = document.getElementById('player-cover');
         if (titleTextEl) {
-            titleTextEl.textContent = song?.name || '未在播放';
+            titleTextEl.textContent = this.sanitizeVisibleCopy(song?.name || '未在播放');
             requestAnimationFrame(() => this.updateTitleMarquee());
         } else if (titleEl) {
-            titleEl.textContent = song?.name || '未在播放';
+            titleEl.textContent = this.sanitizeVisibleCopy(song?.name || '未在播放');
         }
-        if (artistEl) artistEl.textContent = song ? this._getArtistText(song) : '';
+        if (artistEl) artistEl.textContent = song ? this.sanitizeVisibleCopy(this._getArtistText(song)) : '';
         if (coverEl) {
             const coverUrl = normalizePlayerImageUrl(song?.coverUrl || song?.album_cover || song?.album?.picUrl || song?.al?.picUrl || '');
             coverEl.dataset.fallbackApplied = '';
@@ -860,9 +860,9 @@ const Player = {
 
         const song = this.currentSong;
         const coverUrl = normalizePlayerImageUrl(song?.coverUrl || song?.album_cover || song?.album?.picUrl || song?.al?.picUrl || '');
-        titleEl.textContent = song?.name || '未在播放';
-        artistEl.textContent = song ? `歌手：${this._getArtistText(song)}` : '';
-        albumEl.textContent = song ? this._getAlbumText(song) : '';
+        titleEl.textContent = this.sanitizeVisibleCopy(song?.name || '未在播放');
+        artistEl.textContent = song ? this.sanitizeVisibleCopy(`歌手：${this._getArtistText(song)}`) : '';
+        albumEl.textContent = song ? this.sanitizeVisibleCopy(this._getAlbumText(song)) : '';
 
         coverEl.dataset.fallbackApplied = '';
         if (coverUrl) {
@@ -950,16 +950,19 @@ const Player = {
     },
 
     _getAlbumText(song) {
-        const albumName = song?.album?.name || song?.al?.name || song?.raw?.album?.name || song?.raw?.al?.name || '';
+        const albumName = this.sanitizeVisibleCopy(song?.album?.name || song?.al?.name || song?.raw?.album?.name || song?.raw?.al?.name || '');
         return albumName ? `专辑：${albumName}` : '';
     },
 
     _getArtistText(song) {
         const artists = song?.artists || song?.ar || [];
         if (Array.isArray(artists)) {
-            return artists.map((artist) => (typeof artist === 'string' ? artist : artist.name || '')).filter(Boolean).join(', ') || '未知艺术家';
+            return artists
+                .map((artist) => this.sanitizeVisibleCopy(typeof artist === 'string' ? artist : artist.name || ''))
+                .filter(Boolean)
+                .join(', ') || '未知艺术家';
         }
-        if (typeof artists === 'string') return artists || '未知艺术家';
+        if (typeof artists === 'string') return this.sanitizeVisibleCopy(artists) || '未知艺术家';
         return '未知艺术家';
     },
 
@@ -1044,6 +1047,13 @@ const Player = {
         const div = document.createElement('div');
         div.textContent = str || '';
         return div.innerHTML;
+    },
+
+    sanitizeVisibleCopy(value) {
+        if (window.FrontendCopyAlias?.sanitizeVisibleCopy) {
+            return window.FrontendCopyAlias.sanitizeVisibleCopy(value);
+        }
+        return String(value ?? '');
     },
 
     escapeAttribute(value) {

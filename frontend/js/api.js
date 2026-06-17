@@ -18,6 +18,13 @@ const SEARCH_TYPES = {
     all: 1018,
 };
 
+function sanitizeVisibleCopy(value) {
+    if (window.FrontendCopyAlias?.sanitizeVisibleCopy) {
+        return window.FrontendCopyAlias.sanitizeVisibleCopy(value);
+    }
+    return String(value ?? '');
+}
+
 function nowIso() {
     return new Date().toISOString();
 }
@@ -61,21 +68,30 @@ function normalizeArtists(song) {
     const artists = song?.ar || song?.artists || song?.artist || song?.creator || [];
     if (Array.isArray(artists)) {
         return artists
-            .map((artist) => (typeof artist === 'string' ? { name: artist } : { id: artist.id, name: artist.name || artist.nickname || '' }))
+            .map((artist) => (typeof artist === 'string'
+                ? { name: sanitizeVisibleCopy(artist) }
+                : { id: artist.id, name: sanitizeVisibleCopy(artist.name || artist.nickname || '') }))
             .filter((artist) => artist.name);
     }
     if (typeof artists === 'string') {
-        return artists.split(/[\/,]/).map((name) => ({ name: name.trim() })).filter((artist) => artist.name);
+        return artists
+            .split(/[\/,]/)
+            .map((name) => ({ name: sanitizeVisibleCopy(name).trim() }))
+            .filter((artist) => artist.name);
     }
     if (artists && typeof artists === 'object') {
-        return [{ id: artists.id, name: artists.name || artists.nickname || '' }].filter((artist) => artist.name);
+        return [{ id: artists.id, name: sanitizeVisibleCopy(artists.name || artists.nickname || '') }].filter((artist) => artist.name);
     }
     return [];
 }
 
 function normalizeSong(song) {
     if (!song) return null;
-    const album = song.al || song.album || {};
+    const rawAlbum = song.al || song.album || {};
+    const album = {
+        ...rawAlbum,
+        name: sanitizeVisibleCopy(rawAlbum.name || ''),
+    };
     const id = Number(song.id || song.song_id);
     if (!id) return null;
     const coverUrl = album.picUrl || album.blurPicUrl || song.album_cover || song.coverUrl || song.picUrl || '';
@@ -83,7 +99,7 @@ function normalizeSong(song) {
     return {
         id,
         song_id: String(id),
-        name: song.name || song.songName || '',
+        name: sanitizeVisibleCopy(song.name || song.songName || ''),
         artists,
         ar: artists,
         album,
@@ -102,8 +118,8 @@ function normalizePlaylist(playlist) {
     const id = playlist.id || Date.now();
     return {
         id,
-        name: playlist.name || '未命名歌单',
-        description: playlist.description || '',
+        name: sanitizeVisibleCopy(playlist.name || '未命名歌单'),
+        description: sanitizeVisibleCopy(playlist.description || ''),
         coverUrl: playlist.coverUrl || playlist.cover_url || playlist.coverImgUrl || '',
         cover_url: playlist.coverUrl || playlist.cover_url || playlist.coverImgUrl || '',
         trackCount,
@@ -123,8 +139,8 @@ function normalizeAlbum(album) {
     if (!album) return null;
     return {
         id: album.id,
-        name: album.name || '',
-        artistName: pick(album, ['artist.name', 'artists.0.name']),
+        name: sanitizeVisibleCopy(album.name || ''),
+        artistName: sanitizeVisibleCopy(pick(album, ['artist.name', 'artists.0.name'])),
         coverUrl: album.picUrl || album.blurPicUrl || '',
         publishTime: album.publishTime || album.subTime || null,
         size: album.size || album.songCount || 0,
@@ -136,9 +152,9 @@ function normalizeArtist(artist) {
     if (!artist) return null;
     return {
         id: artist.id,
-        name: artist.name || '',
+        name: sanitizeVisibleCopy(artist.name || ''),
         coverUrl: artist.picUrl || artist.img1v1Url || artist.cover || '',
-        briefDesc: artist.briefDesc || '',
+        briefDesc: sanitizeVisibleCopy(artist.briefDesc || ''),
         musicSize: artist.musicSize || artist.musicCount || 0,
         albumSize: artist.albumSize || 0,
         mvSize: artist.mvSize || 0,
@@ -151,8 +167,8 @@ function normalizeMedia(item, kind = 'mv') {
     return {
         id: item.id || item.vid,
         kind,
-        name: item.name || item.title || '',
-        creatorName: item.artistName || pick(item, ['creator.0.userName', 'creator.nickname', 'artists.0.name']),
+        name: sanitizeVisibleCopy(item.name || item.title || ''),
+        creatorName: sanitizeVisibleCopy(item.artistName || pick(item, ['creator.0.userName', 'creator.nickname', 'artists.0.name'])),
         coverUrl: item.cover || item.coverUrl || item.picUrl || item.imgurl || '',
         duration: item.duration || 0,
         playCount: item.playCount || item.playTime || 0,
@@ -652,7 +668,11 @@ const api = {
 
     async getToplists() {
         const data = await request('/toplist/detail');
-        return data.list || [];
+        return (data.list || []).map((item) => ({
+            ...item,
+            name: sanitizeVisibleCopy(item.name || ''),
+            updateFrequency: sanitizeVisibleCopy(item.updateFrequency || ''),
+        }));
     },
 
     async getTopSongs(type = 0) {

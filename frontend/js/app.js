@@ -16,10 +16,17 @@ const MORE_SECTION_META = {
     djs: { label: '热门电台', title: '热门电台', subtitle: '更多电台和节目。' },
 };
 
+function sanitizeVisibleCopy(value) {
+    if (window.FrontendCopyAlias?.sanitizeVisibleCopy) {
+        return window.FrontendCopyAlias.sanitizeVisibleCopy(value);
+    }
+    return String(value ?? '');
+}
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     if (!toast) return;
-    toast.textContent = message;
+    toast.textContent = sanitizeVisibleCopy(message);
     toast.className = `toast ${type}`;
     toast.classList.remove('hidden');
     clearTimeout(toast._timeout);
@@ -34,10 +41,10 @@ function showConfirmDialog(message, options = {}) {
     const cancelBtn = document.getElementById('btn-cancel-confirm');
     if (!modal || !messageEl || !confirmBtn || !cancelBtn) return Promise.resolve(false);
 
-    titleEl.textContent = options.title || '确认操作';
-    messageEl.textContent = message;
-    confirmBtn.textContent = options.confirmText || '确认';
-    cancelBtn.textContent = options.cancelText || '取消';
+    titleEl.textContent = sanitizeVisibleCopy(options.title || '确认操作');
+    messageEl.textContent = sanitizeVisibleCopy(message);
+    confirmBtn.textContent = sanitizeVisibleCopy(options.confirmText || '确认');
+    cancelBtn.textContent = sanitizeVisibleCopy(options.cancelText || '取消');
     confirmBtn.className = options.danger ? 'btn btn-danger-outline' : 'btn btn-primary';
     modal.classList.remove('hidden');
     confirmBtn.focus();
@@ -56,7 +63,7 @@ function closeConfirmDialog(result = false) {
 
 function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str || '';
+    div.textContent = sanitizeVisibleCopy(str || '');
     return div.innerHTML;
 }
 
@@ -654,8 +661,8 @@ async function openPlaylistDetail(playlistId) {
 function renderPlaylistDetail(playlist, editable) {
     const songs = playlist.tracks || playlist.songs || [];
     document.getElementById('detail-source').textContent = playlist.source === 'netease' ? '导入歌单' : '本地歌单';
-    document.getElementById('detail-name').textContent = playlist.name || '未命名歌单';
-    document.getElementById('detail-desc').textContent = playlist.description || '';
+    document.getElementById('detail-name').textContent = sanitizeVisibleCopy(playlist.name || '未命名歌单');
+    document.getElementById('detail-desc').textContent = sanitizeVisibleCopy(playlist.description || '');
     document.getElementById('detail-meta-text').textContent = `${songs.length} 首歌曲 · ${formatCount(playlist.playCount || 0)} 次播放`;
     setImageSrc(document.getElementById('detail-cover'), playlist.coverUrl || playlist.cover_url || '');
 
@@ -717,10 +724,10 @@ function setEntityHeader({ label, title, subtitle, description, coverUrl, action
         hero.className = 'detail-hero';
         if (heroClass) hero.classList.add(heroClass);
     }
-    document.getElementById('entity-label').textContent = label || '';
-    document.getElementById('entity-title').textContent = title || '';
-    document.getElementById('entity-subtitle').textContent = subtitle || '';
-    document.getElementById('entity-description').textContent = description || '';
+    document.getElementById('entity-label').textContent = sanitizeVisibleCopy(label || '');
+    document.getElementById('entity-title').textContent = sanitizeVisibleCopy(title || '');
+    document.getElementById('entity-subtitle').textContent = sanitizeVisibleCopy(subtitle || '');
+    document.getElementById('entity-description').textContent = sanitizeVisibleCopy(description || '');
     setImageSrc(document.getElementById('entity-cover'), coverUrl || '');
     document.getElementById('entity-actions').innerHTML = actions;
     document.getElementById('entity-media-player').classList.add('hidden');
