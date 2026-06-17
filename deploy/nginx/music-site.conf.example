@@ -1,6 +1,5 @@
-# Replace these two names before copying this file into /etc/nginx/sites-available/.
-# Frontend: music.your-domain.com
-# API:      api.your-domain.com
+# Replace this name before copying this file into /etc/nginx/sites-available/.
+# Site: music.your-domain.com
 
 upstream music_web {
     server 127.0.0.1:8000;
@@ -15,25 +14,19 @@ server {
     listen [::]:80;
     server_name music.your-domain.com;
 
-    location / {
-        proxy_pass http://music_web;
+    client_max_body_size 20m;
+
+    location /api/ {
+        proxy_pass http://music_api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-}
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name api.your-domain.com;
-
-    client_max_body_size 20m;
 
     location / {
-        proxy_pass http://music_api;
+        proxy_pass http://music_web;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

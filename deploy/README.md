@@ -43,7 +43,6 @@ npm install --omit=dev
 
 ```text
 music.your-domain.com
-api.your-domain.com
 ```
 
 需要替换三个地方：
@@ -57,7 +56,7 @@ ecosystem.config.cjs
 把 API 地址写成：
 
 ```js
-window.NCM_API_BASE = 'https://api.your-domain.com';
+window.NCM_API_BASE = window.location.origin + '/api';
 ```
 
 把 `sitemap.xml` 里的首页写成：
@@ -106,10 +105,9 @@ sudo cp deploy/nginx/music-site.conf.example /etc/nginx/sites-available/music-si
 
 ```text
 music.your-domain.com
-api.your-domain.com
 ```
 
-替换成你的真实域名。
+替换成你的真实域名。模板已经默认把同域名下的 `/api/*` 转发到本机 `3000` 端口。
 
 启用配置：
 
@@ -124,7 +122,7 @@ sudo systemctl reload nginx
 域名 DNS 已经指向服务器公网 IP 后，运行：
 
 ```bash
-sudo certbot --nginx -d music.your-domain.com -d api.your-domain.com
+sudo certbot --nginx -d music.your-domain.com
 ```
 
 按提示选择自动跳转 HTTPS。
@@ -149,7 +147,7 @@ https://music.your-domain.com
 也可以在服务器上运行：
 
 ```bash
-bash deploy/scripts/check-public-site.sh https://music.your-domain.com https://api.your-domain.com
+bash deploy/scripts/check-public-site.sh https://music.your-domain.com
 ```
 
 需要确认：

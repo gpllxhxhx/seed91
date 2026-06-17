@@ -22,6 +22,11 @@ function nowIso() {
     return new Date().toISOString();
 }
 
+function buildApiUrl(apiPath) {
+    const normalizedPath = String(apiPath || '').replace(/^\/+/, '');
+    return new URL(normalizedPath, `${NCM_API_BASE}/`);
+}
+
 function pick(obj, paths, fallback = '') {
     for (const path of paths) {
         const value = path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
@@ -191,7 +196,7 @@ function getLocalPlaylist(id) {
 
 async function request(path, params = {}) {
     assertApiConfigured();
-    const url = new URL(path, NCM_API_BASE);
+    const url = buildApiUrl(path);
     Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
     });
@@ -617,7 +622,7 @@ const api = {
 
     getStreamUrl(songId) {
         assertApiConfigured();
-        const url = new URL('/song/url/v1', NCM_API_BASE);
+        const url = buildApiUrl('/song/url/v1');
         url.searchParams.set('id', songId);
         url.searchParams.set('level', 'exhigh');
         url.searchParams.set('unblock', 'true');

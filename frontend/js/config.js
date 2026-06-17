@@ -1,4 +1,3 @@
-// Fill this with your public API address after deploying the backend.
-// Example: window.NCM_API_BASE = 'https://api.your-domain.com';
-window.NCM_API_BASE = window.NCM_API_BASE || '';
-
+// Same-origin deployment default: expose the backend through /api on the web domain.
+// Example: https://music.example.com/api -> local backend service.
+window.NCM_API_BASE = window.NCM_API_BASE || `${window.location.origin}/api`;

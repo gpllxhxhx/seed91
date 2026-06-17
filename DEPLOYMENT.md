@@ -3,7 +3,7 @@
 这个项目分为两部分：
 
 - `frontend/`：用户看到的网页，可以放到静态网站平台。
-- `NeteaseCloudMusicApiEnhanced/`：网页依赖的音乐 API，需要部署成公网后端服务。
+- `NeteaseCloudMusicApiEnhanced/`：网页依赖的音乐 API，部署在服务器本机，由同域名下的 `/api` 反向代理转发。
 
 只上传 `frontend/` 也能打开页面，但如果不部署 API，别人访问时无法正常搜索和播放音乐。
 
@@ -31,18 +31,14 @@ deploy/README.md
    npm start
    ```
 
-   服务默认监听平台提供的 `PORT`。部署完成后，你会得到一个公网地址，例如：
-
-   ```text
-   https://api.your-domain.com
-   ```
+   服务默认监听平台提供的 `PORT`。如果你按仓库里的 PM2 和 Nginx 模板部署，后端只需要在服务器本机运行，不需要单独对外暴露域名。
 
 2. 配置前端 API 地址
 
-   打开 `frontend/js/config.js`，把地址改成你的后端公网地址：
+   打开 `frontend/js/config.js`，把地址改成同域 `/api`：
 
    ```js
-   window.NCM_API_BASE = 'https://api.your-domain.com';
+   window.NCM_API_BASE = window.location.origin + '/api';
    ```
 
 3. 部署前端网页
@@ -61,7 +57,7 @@ deploy/README.md
 
 4. 绑定域名
 
-   给前端绑定一个正式域名，例如：
+   给网站绑定一个正式域名，例如：
 
    ```text
    https://music.your-domain.com
@@ -110,5 +106,6 @@ http://localhost:8000
 ## 注意
 
 - 如果前端是 `https`，API 也必须是 `https`，否则浏览器会拦截请求。
+- 如果使用同域部署，Nginx 需要把 `/api/*` 转发到本机的 `3000` 端口。
 - `frontend/js/config.js` 里的地址不要保留 `localhost`，线上用户无法访问你电脑上的本地服务。
 - 如果网站主要面向中国大陆用户，域名和服务器可能还涉及备案要求。
