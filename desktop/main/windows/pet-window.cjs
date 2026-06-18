@@ -2,28 +2,32 @@ const { BrowserWindow } = require('electron');
 const path = require('path');
 
 class PetWindow {
-  constructor({ app, config, logger, buildMenu }) {
+  constructor({ app, config, logger, buildMenu, petPackage }) {
     this.app = app;
     this.config = config;
     this.logger = logger;
     this.buildMenu = buildMenu;
+    this.petPackage = petPackage;
     this.window = null;
   }
 
   create() {
     if (this.window && !this.window.isDestroyed()) return this.window;
     const petConfig = this.config.get('pet');
+    const manifest = this.petPackage?.manifest || {};
     this.logger?.info('creating pet window', petConfig);
 
     this.window = new BrowserWindow({
-      width: 260,
-      height: 320,
+      width: Number(manifest.width) || 260,
+      height: Number(manifest.height) || 320,
       x: Number.isFinite(petConfig.x) ? petConfig.x : undefined,
       y: Number.isFinite(petConfig.y) ? petConfig.y : undefined,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
       resizable: false,
+      maximizable: false,
+      minimizable: false,
       skipTaskbar: true,
       hasShadow: false,
       show: false,

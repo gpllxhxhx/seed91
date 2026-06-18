@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const net = require('net');
 const path = require('path');
+const { resolveNodeExecPath } = require('../../shared/runtime-paths.cjs');
 
 const HOST = '127.0.0.1';
 const TOKEN_HEADER = 'x-music-desktop-token';
@@ -57,11 +58,18 @@ class ApiProcessService {
   async start() {
     const apiDir = this.getResourcePath('NeteaseCloudMusicApiEnhanced');
     const runner = path.join(this.getAppRoot(), 'desktop', 'api-runner.cjs');
+    const nodePath = resolveNodeExecPath(process.env, process.execPath);
     const frontendOrigin = `http://${HOST}:${this.frontendPort}`;
     const selectedPort = await this.findAvailablePort(3000);
-    this.logger?.info('starting api process', { runner, apiDir, host: HOST, port: selectedPort });
+    this.logger?.info('starting api process', {
+      runner,
+      apiDir,
+      host: HOST,
+      port: selectedPort,
+      nodePath,
+    });
 
-    this.process = spawn(process.execPath, [runner], {
+    this.process = spawn(nodePath, [runner], {
       cwd: this.getAppRoot(),
       env: {
         ...process.env,
@@ -77,6 +85,7 @@ class ApiProcessService {
         FOLLOW_SOURCE_ORDER: process.env.FOLLOW_SOURCE_ORDER || 'true',
       },
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      shell: false,
       windowsHide: true,
     });
 

@@ -7,20 +7,23 @@
   <link rel="stylesheet" href="./PetView.css">
 </head>
 <body>
-  <main class="pet-shell" id="pet-shell" title="单击播放/暂停，双击打开播放器">
-    <div class="pet-shadow"></div>
-    <button class="pet" id="pet-button" type="button" aria-label="音乐桌宠">
-      <div class="pet-ear pet-ear-left"></div>
-      <div class="pet-ear pet-ear-right"></div>
-      <div class="pet-face">
-        <div class="pet-eye"></div>
-        <div class="pet-eye"></div>
-        <div class="pet-mouth"></div>
-      </div>
-      <div class="pet-note" aria-hidden="true">♪</div>
-    </button>
-    <div class="pet-status" id="pet-status">空闲</div>
+  <main class="pet-shell" id="pet-shell" title="左键打开控制面板，拖动空白处移动桌宠">
+    <section class="pet-panel" id="pet-panel" aria-label="桌宠控制面板">
+      <button class="pet-action" id="pet-action-play" type="button">播放 / 暂停</button>
+      <button class="pet-action" id="pet-action-prev" type="button">上一首</button>
+      <button class="pet-action" id="pet-action-next" type="button">下一首</button>
+      <button class="pet-action" id="pet-action-open" type="button">打开播放器</button>
+      <button class="pet-action pet-action-danger" id="pet-action-quit" type="button">退出桌宠</button>
+    </section>
+    <div class="pet-stage">
+      <div class="pet-shadow"></div>
+      <button class="pet-button" id="pet-button" type="button" aria-label="打开桌宠控制面板" aria-expanded="false">
+        <span class="pet-sprite" id="pet-sprite" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div class="pet-status" id="pet-status">桌宠启动中...</div>
   </main>
+  <script src="./animation-state.cjs"></script>
   <script src="./PetView.js"></script>
 </body>
 </html>

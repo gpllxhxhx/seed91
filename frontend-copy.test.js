@@ -46,3 +46,12 @@ test('copy alias helper is exposed on window for browser scripts', () => {
 
     assert.equal(typeof context.window.FrontendCopyAlias?.sanitizeVisibleCopy, 'function');
 });
+
+test('import section removes link-based copy and placeholders', () => {
+    const html = read('frontend/index.html');
+
+    assert.equal(html.includes('支持歌单链接'), false);
+    assert.equal(html.includes('支持歌曲链接'), false);
+    assert.equal(html.includes('https://music.163.com/playlist?id=123456'), false);
+    assert.equal(html.includes('https://music.163.com/song?id=123456'), false);
+});

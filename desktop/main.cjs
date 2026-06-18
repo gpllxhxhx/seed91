@@ -7,6 +7,7 @@ const path = require('path');
 const { ApiProcessService, HOST } = require('./main/services/api-process-service.cjs');
 const { ConfigStore } = require('./main/services/config-store.cjs');
 const { Logger } = require('./main/services/logger.cjs');
+const { loadPetPackage } = require('./main/services/pet-package-service.cjs');
 const { PlaybackService } = require('./main/services/playback-service.cjs');
 const { PetWindow } = require('./main/windows/pet-window.cjs');
 const { LyricWindow } = require('./main/windows/lyric-window.cjs');
@@ -21,6 +22,7 @@ let desktopToken = '';
 let configStore = null;
 let logger = null;
 let playbackService = null;
+let petPackage = null;
 let petWindow = null;
 let lyricWindow = null;
 let playerWindow = null;
@@ -175,6 +177,10 @@ function ensurePlayerForCommand() {
 
 function setupIpc() {
   ipcMain.handle('playback:get-state', () => playbackService.getState());
+  ipcMain.handle('pet:get-package', () => ({
+    manifest: petPackage?.manifest || null,
+    assetBaseUrl: petPackage?.assetBaseUrl || '',
+  }));
   ipcMain.handle('playback:toggle', () => actions.togglePlayback());
   ipcMain.handle('playback:play', () => playbackService.play());
   ipcMain.handle('playback:pause', () => playbackService.pause());
@@ -251,13 +257,17 @@ async function bootstrap() {
   });
   const apiInfo = await apiService.start();
   apiBaseUrl = apiInfo.baseUrl;
+  petPackage = loadPetPackage({
+    app,
+    petId: configStore.get('pet')?.skin || 'default',
+  });
 
   playerWindow = new PlayerWindow({
     app,
     frontendUrl: `http://${HOST}:${frontendPort}/`,
     logger,
   });
-  petWindow = new PetWindow({ app, config: configStore, logger, buildMenu });
+  petWindow = new PetWindow({ app, config: configStore, logger, buildMenu, petPackage });
   lyricWindow = new LyricWindow({ app, config: configStore, logger });
 
   setupIpc();

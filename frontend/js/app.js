@@ -1082,15 +1082,17 @@ async function loadDesktopVersion() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const meta = await res.json();
         const file = meta.file || 'MusicPlayer-Setup.exe';
-        const releasedAt = meta.releasedAt ? new Date(meta.releasedAt).toLocaleString('zh-CN') : '未知时间';
-        summaryEl.textContent = `最新版本 ${meta.version || '未知'}，发布于 ${releasedAt}`;
+        const releaseDate = meta.releaseDate ? new Date(meta.releaseDate).toLocaleDateString('zh-CN') : '未知日期';
+        const notes = Array.isArray(meta.notes) ? meta.notes.join(' / ') : (meta.notes || 'Windows x64 桌面安装包');
+        summaryEl.textContent = `最新测试版 ${meta.version || '未知'}，发布于 ${releaseDate}`;
         linkEl.href = `/downloads/${encodeURIComponent(file)}`;
         linkEl.download = file;
         linkEl.classList.remove('disabled');
         detailsEl.innerHTML = `
             <div>文件：<code>${escapeHtml(file)}</code></div>
             <div>SHA256：<code>${escapeHtml(meta.sha256 || '构建后生成')}</code></div>
-            <div>说明：${escapeHtml(meta.notes || 'Windows x64 桌面安装包')}</div>
+            <div>平台：<code>${escapeHtml(meta.platform || 'win32-x64')}</code></div>
+            <div>说明：${escapeHtml(notes)}</div>
         `;
     } catch (err) {
         summaryEl.textContent = '暂无可下载的桌面版安装包。';

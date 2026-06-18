@@ -1,9 +1,11 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { resolveNodeExecPath } = require('./runtime-paths.cjs');
 
 const rootDir = path.resolve(__dirname, '..');
 const apiDir = path.join(rootDir, 'NeteaseCloudMusicApiEnhanced');
 const inheritedCorsOrigin = process.env.CORS_ALLOW_ORIGIN || '';
+const nodePath = resolveNodeExecPath(process.env, process.execPath);
 
 const env = {
   ...process.env,
@@ -16,10 +18,11 @@ const env = {
   FOLLOW_SOURCE_ORDER: process.env.FOLLOW_SOURCE_ORDER || 'true',
 };
 
-const child = spawn(process.execPath, ['app.js'], {
+const child = spawn(nodePath, ['app.js'], {
   cwd: apiDir,
   env,
   stdio: 'inherit',
+  shell: false,
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
