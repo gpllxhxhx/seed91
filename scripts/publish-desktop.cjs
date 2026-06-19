@@ -3,29 +3,23 @@ const fs = require('fs');
 const path = require('path');
 
 const rootDir = path.resolve(__dirname, '..');
-const distDir = path.join(rootDir, 'dist');
 const downloadsDir = path.join(rootDir, 'frontend', 'downloads');
 const packageJson = require(path.join(rootDir, 'package.json'));
+const tauriReleaseRelativePath = 'apps/desktop-pet/src-tauri/target/release/music-pet-desktop.exe';
+const tauriReleaseExe = path.join(rootDir, tauriReleaseRelativePath);
+const publishedFileName = 'desktop-pet-player-v0.1.0-windows.exe';
 
-function findInstaller() {
-  if (!fs.existsSync(distDir)) {
-    throw new Error('dist directory does not exist. Run npm run desktop:build first.');
+function getReleaseExecutable() {
+  if (!fs.existsSync(tauriReleaseExe)) {
+    throw new Error(
+      'Tauri release executable does not exist. Run npm run tauri -- build in apps/desktop-pet first.'
+    );
   }
 
-  const installers = fs
-    .readdirSync(distDir)
-    .filter((file) => /^MusicPet-Setup-.+\.exe$/i.test(file))
-    .map((file) => {
-      const absolutePath = path.join(distDir, file);
-      return { file, absolutePath, mtimeMs: fs.statSync(absolutePath).mtimeMs };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
-
-  if (!installers.length) {
-    throw new Error('No MusicPet setup executable found in dist.');
-  }
-
-  return installers[0];
+  return {
+    file: publishedFileName,
+    absolutePath: tauriReleaseExe,
+  };
 }
 
 function sha256(filePath) {
@@ -34,28 +28,34 @@ function sha256(filePath) {
   return hash.digest('hex');
 }
 
-const installer = findInstaller();
+const executable = getReleaseExecutable();
 fs.mkdirSync(downloadsDir, { recursive: true });
 
-const targetPath = path.join(downloadsDir, installer.file);
-fs.copyFileSync(installer.absolutePath, targetPath);
+const targetPath = path.join(downloadsDir, executable.file);
+fs.copyFileSync(executable.absolutePath, targetPath);
 
 const metadata = {
   version: packageJson.version,
   platform: 'win32-x64',
-  file: installer.file,
+  channel: 'beta',
+  portable: true,
+  file: executable.file,
   sha256: sha256(targetPath),
   releaseDate: new Date().toISOString().slice(0, 10),
   notes: [
-    '新增桌宠播放器首版',
-    '支持桌面歌词',
-    '支持播放/暂停/切歌',
+    '桌宠音乐播放器 Windows 内测版',
+    '支持导入歌单与歌曲播放',
+    '支持上一首、下一首、桌宠拖动和右键退出',
   ],
 };
 
-fs.writeFileSync(path.join(downloadsDir, 'latest'), `${installer.file}\n`, 'utf-8');
+fs.writeFileSync(path.join(downloadsDir, 'latest'), `${executable.file}\n`, 'utf-8');
 fs.writeFileSync(path.join(downloadsDir, 'version.json'), `${JSON.stringify(metadata, null, 2)}\n`, 'utf-8');
-fs.writeFileSync(path.join(downloadsDir, `${installer.file}.sha256`), `${metadata.sha256}  ${installer.file}\n`, 'utf-8');
+fs.writeFileSync(
+  path.join(downloadsDir, `${executable.file}.sha256`),
+  `${metadata.sha256}  ${executable.file}\n`,
+  'utf-8'
+);
 
-console.log(`Published ${installer.file} to ${path.relative(rootDir, downloadsDir)}`);
+console.log(`Published ${executable.file} to ${path.relative(rootDir, downloadsDir)}`);
 console.log(`SHA256 ${metadata.sha256}`);

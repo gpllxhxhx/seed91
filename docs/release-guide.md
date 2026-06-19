@@ -145,3 +145,14 @@ Try these steps:
 
 This phase only validates a Windows exe release path.
 It does not add auto-update, login, lyrics, search, backend packaging, or installer signing.
+
+## Web Beta Publish Note
+
+For the website beta download flow, publish the stage-8 Tauri executable as a portable Windows beta exe:
+
+```text
+frontend/downloads/desktop-pet-player-v0.1.0-windows.exe
+```
+
+This file is a portable runnable exe, not an installer.
+Do not label it as `setup.exe` unless a real installer build is introduced later.
