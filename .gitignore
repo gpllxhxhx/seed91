@@ -4,6 +4,8 @@ node_modules/
 # Build outputs
 dist/
 frontend/downloads/*.exe
+apps/desktop-pet/src-tauri/target/
+apps/desktop-pet/src-tauri/gen/
 
 # Local environment and logs
 .env
