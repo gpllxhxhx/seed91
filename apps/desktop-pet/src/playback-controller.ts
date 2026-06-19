@@ -10,6 +10,11 @@ export type PlaybackSong = {
   name: string;
 };
 
+export type PlaybackStateSnapshot = {
+  currentSong: PlaybackSong | null;
+  currentSongIndex: number;
+};
+
 type PlaybackRefs = {
   stage: {
     dataset: {
@@ -28,6 +33,7 @@ type PlaybackRefs = {
 type PlaybackControllerOptions = {
   resolveSongUrl: (songId: string | number) => Promise<string>;
   initialSong?: PlaybackSong;
+  onStateChange?: (snapshot: PlaybackStateSnapshot) => void;
 };
 
 function setPaused(refs: PlaybackRefs): void {
@@ -78,10 +84,18 @@ export function createPlaybackController(
   options: PlaybackControllerOptions
 ) {
   let currentSong: PlaybackSong | null = options.initialSong ?? null;
+  let playlistSongs: PlaybackSong[] = [];
+  let currentSongIndex = -1;
   const songUrlCache = new Map<string, string>();
   let pendingSongUrl: Promise<string> | null = null;
   let pendingSongId = "";
   let isToggling = false;
+  const emitStateChange = () => {
+    options.onStateChange?.({
+      currentSong,
+      currentSongIndex
+    });
+  };
 
   setPaused(refs);
   clearError(refs);
@@ -95,7 +109,19 @@ export function createPlaybackController(
     setPaused(refs);
   });
 
-  audio.addEventListener("ended", () => {
+  audio.addEventListener("ended", async () => {
+    if (playlistSongs.length > 0 && currentSongIndex >= 0) {
+      if (currentSongIndex < playlistSongs.length - 1) {
+        await controller.playSongAtIndex(currentSongIndex + 1);
+        return;
+      }
+
+      clearError(refs);
+      refs.stage.dataset.playbackState = "paused";
+      refs.status.textContent = "播放结束";
+      return;
+    }
+
     setPaused(refs);
   });
 
@@ -170,12 +196,41 @@ export function createPlaybackController(
     }
   }
 
-  return {
+  const controller = {
+    setQueue(songs: PlaybackSong[]): void {
+      playlistSongs = songs.map((song) => ({ ...song }));
+
+      if (playlistSongs.length === 0) {
+        currentSongIndex = -1;
+        emitStateChange();
+        return;
+      }
+
+      const currentId = getCurrentSongId();
+
+      if (!currentId) {
+        currentSongIndex = -1;
+        emitStateChange();
+        return;
+      }
+
+      currentSongIndex = playlistSongs.findIndex(
+        (song) => String(song.id) === currentId
+      );
+      emitStateChange();
+    },
+    getCurrentSongIndex(): number {
+      return currentSongIndex;
+    },
     getCurrentSong(): PlaybackSong | null {
       return currentSong;
     },
     async playSong(song: PlaybackSong): Promise<void> {
       currentSong = song;
+      currentSongIndex = playlistSongs.findIndex(
+        (item) => String(item.id) === String(song.id)
+      );
+      emitStateChange();
 
       if (!audio.paused) {
         audio.pause();
@@ -192,6 +247,51 @@ export function createPlaybackController(
       } finally {
         isToggling = false;
       }
+    },
+    async playSongAtIndex(index: number): Promise<void> {
+      if (!Number.isInteger(index) || index < 0 || index >= playlistSongs.length) {
+        showError(refs, "请先导入歌单");
+        return;
+      }
+
+      currentSongIndex = index;
+      await controller.playSong(playlistSongs[index]);
+    },
+    async playNext(): Promise<void> {
+      if (playlistSongs.length === 0) {
+        showError(refs, "请先导入歌单");
+        return;
+      }
+
+      if (currentSongIndex < 0) {
+        await controller.playSongAtIndex(0);
+        return;
+      }
+
+      if (currentSongIndex >= playlistSongs.length - 1) {
+        showError(refs, "已经是最后一首");
+        return;
+      }
+
+      await controller.playSongAtIndex(currentSongIndex + 1);
+    },
+    async playPrevious(): Promise<void> {
+      if (playlistSongs.length === 0) {
+        showError(refs, "请先导入歌单");
+        return;
+      }
+
+      if (currentSongIndex < 0) {
+        await controller.playSongAtIndex(0);
+        return;
+      }
+
+      if (currentSongIndex === 0) {
+        showError(refs, "已经是第一首");
+        return;
+      }
+
+      await controller.playSongAtIndex(currentSongIndex - 1);
     },
     async togglePlayback(): Promise<void> {
       if (isToggling) {
@@ -217,4 +317,6 @@ export function createPlaybackController(
       audio.pause();
     }
   };
+
+  return controller;
 }

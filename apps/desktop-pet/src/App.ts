@@ -20,6 +20,22 @@ export function renderApp(): string {
         <p class="playback-status" data-playback-status>已暂停</p>
         <p class="playback-error" data-playback-error hidden></p>
         <section class="playlist-panel" aria-label="Playlist import panel">
+          <div class="queue-controls" aria-label="Playlist queue controls">
+            <button
+              type="button"
+              class="queue-button"
+              data-queue-previous
+            >
+              上一首
+            </button>
+            <button
+              type="button"
+              class="queue-button"
+              data-queue-next
+            >
+              下一首
+            </button>
+          </div>
           <form class="playlist-form" data-playlist-form>
             <label class="playlist-label" for="playlist-input">歌单导入</label>
             <div class="playlist-form-row">

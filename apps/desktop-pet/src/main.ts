@@ -37,6 +37,8 @@ const playlistSubmit = root.querySelector<HTMLButtonElement>("[data-playlist-sub
 const playlistFeedback = root.querySelector<HTMLElement>("[data-playlist-feedback]");
 const playlistTitle = root.querySelector<HTMLElement>("[data-playlist-title]");
 const playlistList = root.querySelector<HTMLElement>("[data-playlist-list]");
+const previousButton = root.querySelector<HTMLButtonElement>("[data-queue-previous]");
+const nextButton = root.querySelector<HTMLButtonElement>("[data-queue-next]");
 
 if (!petSurface) {
   throw new Error("Pet surface element was not found.");
@@ -53,7 +55,9 @@ if (
   !playlistSubmit ||
   !playlistFeedback ||
   !playlistTitle ||
-  !playlistList
+  !playlistList ||
+  !previousButton ||
+  !nextButton
 ) {
   throw new Error("Playlist panel elements were not found.");
 }
@@ -68,6 +72,8 @@ const playlistSubmitElement = playlistSubmit;
 const playlistFeedbackElement = playlistFeedback;
 const playlistTitleElement = playlistTitle;
 const playlistListElement = playlistList;
+const previousButtonElement = previousButton;
+const nextButtonElement = nextButton;
 const testAudio = new Audio();
 const apiBase = import.meta.env.VITE_MUSIC_API_BASE ?? "";
 const resolveSongUrl = createSongUrlResolver({
@@ -79,16 +85,18 @@ const resolvePlaylist = createPlaylistResolver({
 
 testAudio.preload = "auto";
 
+let currentPlaylist: ResolvedPlaylist | null = null;
 const playbackController = createPlaybackController(testAudio, {
   stage: playbackStageElement,
   status: playbackStatusElement,
   error: playbackErrorElement
 }, {
   resolveSongUrl,
-  initialSong: DEFAULT_SONG
+  initialSong: DEFAULT_SONG,
+  onStateChange: () => {
+    syncPlaybackView();
+  }
 });
-
-let currentPlaylist: ResolvedPlaylist | null = null;
 
 function getCurrentSongId(): string {
   return String(playbackController.getCurrentSong()?.id ?? "");
@@ -98,6 +106,14 @@ function setCurrentSongLabel(song: PlaybackSong | null): void {
   currentSongElement.textContent = song
     ? `当前歌曲：${song.name}`
     : "当前歌曲：未选择";
+}
+
+function syncPlaybackView(): void {
+  setCurrentSongLabel(playbackController.getCurrentSong());
+
+  if (currentPlaylist) {
+    renderImportedPlaylist(currentPlaylist);
+  }
 }
 
 function setPlaylistFeedbackMessage(
@@ -162,6 +178,12 @@ async function importPlaylist(): Promise<void> {
   try {
     const playlist = await resolvePlaylist(rawInput);
     currentPlaylist = playlist;
+    playbackController.setQueue(
+      playlist.songs.map((song) => ({
+        id: song.id,
+        name: song.name
+      }))
+    );
     renderImportedPlaylist(playlist);
     setPlaylistFeedbackMessage("");
   } catch (error) {
@@ -199,19 +221,21 @@ playlistListElement.addEventListener("click", async (event) => {
   }
 
   const songId = Number(songButton.dataset.playlistSongId);
-  const song = currentPlaylist.songs.find((item) => item.id === songId);
+  const songIndex = currentPlaylist.songs.findIndex((item) => item.id === songId);
 
-  if (!song) {
+  if (songIndex < 0) {
     return;
   }
 
-  await playbackController.playSong({
-    id: song.id,
-    name: song.name
-  });
+  await playbackController.playSongAtIndex(songIndex);
+});
 
-  setCurrentSongLabel(playbackController.getCurrentSong());
-  renderImportedPlaylist(currentPlaylist);
+previousButtonElement.addEventListener("click", async () => {
+  await playbackController.playPrevious();
+});
+
+nextButtonElement.addEventListener("click", async () => {
+  await playbackController.playNext();
 });
 
 setCurrentSongLabel(playbackController.getCurrentSong());

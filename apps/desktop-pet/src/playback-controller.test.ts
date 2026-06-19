@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPlaybackController } from "./playback-controller";
 
 const DEFAULT_SONG = { id: 1496089152, name: "默认测试歌曲" };
@@ -157,5 +157,168 @@ describe("createPlaybackController", () => {
     expect(controller.getCurrentSong()?.name).toBe("列表歌曲");
     expect(refs.stage.dataset.playbackState).toBe("playing");
     expect(refs.status.textContent).toBe("播放中");
+  });
+
+  it("plays the next song in the queue and updates the current index", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([
+      { id: 101, name: "第一首" },
+      { id: 202, name: "第二首" }
+    ]);
+
+    await controller.playSongAtIndex(0);
+    await controller.playNext();
+
+    expect(controller.getCurrentSongIndex()).toBe(1);
+    expect(controller.getCurrentSong()?.name).toBe("第二首");
+    expect(audio.src).toBe("https://example.com/202.mp3");
+  });
+
+  it("plays the previous song in the queue and updates the current index", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([
+      { id: 101, name: "第一首" },
+      { id: 202, name: "第二首" }
+    ]);
+
+    await controller.playSongAtIndex(1);
+    await controller.playPrevious();
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(controller.getCurrentSong()?.name).toBe("第一首");
+    expect(audio.src).toBe("https://example.com/101.mp3");
+  });
+
+  it("shows a boundary message when trying to go previous on the first song", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([{ id: 101, name: "第一首" }]);
+    await controller.playSongAtIndex(0);
+    await controller.playPrevious();
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(refs.error.textContent).toBe("已经是第一首");
+    expect(refs.error.hidden).toBe(false);
+  });
+
+  it("defaults to the first song when previous is clicked before a song is selected", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([
+      { id: 101, name: "第一首" },
+      { id: 202, name: "第二首" }
+    ]);
+
+    await controller.playPrevious();
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(controller.getCurrentSong()?.name).toBe("第一首");
+    expect(audio.src).toBe("https://example.com/101.mp3");
+  });
+
+  it("shows a boundary message when trying to go next on the last song", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([{ id: 101, name: "第一首" }]);
+    await controller.playSongAtIndex(0);
+    await controller.playNext();
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(refs.error.textContent).toBe("已经是最后一首");
+    expect(refs.error.hidden).toBe(false);
+  });
+
+  it("defaults to the first song when next is clicked before a song is selected", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([
+      { id: 101, name: "第一首" },
+      { id: 202, name: "第二首" }
+    ]);
+
+    await controller.playNext();
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(controller.getCurrentSong()?.name).toBe("第一首");
+    expect(audio.src).toBe("https://example.com/101.mp3");
+  });
+
+  it("automatically advances to the next queue song on ended", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const onStateChange = vi.fn();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`,
+      onStateChange
+    });
+
+    controller.setQueue([
+      { id: 101, name: "第一首" },
+      { id: 202, name: "第二首" }
+    ]);
+
+    await controller.playSongAtIndex(0);
+    audio.dispatchEvent(new Event("ended"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(controller.getCurrentSongIndex()).toBe(1);
+    expect(controller.getCurrentSong()?.name).toBe("第二首");
+    expect(audio.src).toBe("https://example.com/202.mp3");
+    expect(onStateChange).toHaveBeenLastCalledWith({
+      currentSong: { id: 202, name: "第二首" },
+      currentSongIndex: 1
+    });
+  });
+
+  it("shows playback ended on the final queue song without looping", async () => {
+    const audio = new FakeAudio();
+    const refs = createPlaybackRefs();
+    const controller = createPlaybackController(audio, refs, {
+      resolveSongUrl: async (songId: string | number) =>
+        `https://example.com/${songId}.mp3`
+    });
+
+    controller.setQueue([{ id: 101, name: "第一首" }]);
+
+    await controller.playSongAtIndex(0);
+    audio.dispatchEvent(new Event("ended"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(controller.getCurrentSongIndex()).toBe(0);
+    expect(refs.stage.dataset.playbackState).toBe("paused");
+    expect(refs.status.textContent).toBe("播放结束");
   });
 });
