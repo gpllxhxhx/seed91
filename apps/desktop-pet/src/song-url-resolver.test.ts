@@ -37,11 +37,10 @@ describe("createSongUrlResolver", () => {
 
     const resolveSongUrl = createSongUrlResolver({
       apiBase: "http://127.0.0.1:3000",
-      songId: "1496089152",
       fetchImpl
     });
 
-    await expect(resolveSongUrl()).resolves.toBe("https://example.com/proxy.mp3");
+    await expect(resolveSongUrl("1496089152")).resolves.toBe("https://example.com/proxy.mp3");
     expect(fetchImpl).toHaveBeenCalledWith(
       "http://127.0.0.1:3000/song/url/v1?id=1496089152&level=exhigh&unblock=true",
       expect.objectContaining({
@@ -65,11 +64,10 @@ describe("createSongUrlResolver", () => {
 
     const resolveSongUrl = createSongUrlResolver({
       apiBase: "http://127.0.0.1:3000",
-      songId: "1496089152",
       fetchImpl
     });
 
-    await expect(resolveSongUrl()).resolves.toBe("https://example.com/song.mp3");
+    await expect(resolveSongUrl(1001)).resolves.toBe("https://example.com/song.mp3");
   });
 
   it("falls back to a top-level url field when the payload is wrapped differently", async () => {
@@ -81,11 +79,10 @@ describe("createSongUrlResolver", () => {
 
     const resolveSongUrl = createSongUrlResolver({
       apiBase: "http://127.0.0.1:3000",
-      songId: "1496089152",
       fetchImpl
     });
 
-    await expect(resolveSongUrl()).resolves.toBe("https://example.com/top-level.mp3");
+    await expect(resolveSongUrl(1002)).resolves.toBe("https://example.com/top-level.mp3");
   });
 
   it("throws a request error when the backend responds with 404", async () => {
@@ -100,11 +97,10 @@ describe("createSongUrlResolver", () => {
 
     const resolveSongUrl = createSongUrlResolver({
       apiBase: "http://127.0.0.1:3000",
-      songId: "1496089152",
       fetchImpl
     });
 
-    await expect(resolveSongUrl()).rejects.toThrow("请求失败：HTTP 404");
+    await expect(resolveSongUrl(1003)).rejects.toThrow("请求失败：HTTP 404");
   });
 
   it("throws a clear error when the backend response has no playable url", async () => {
@@ -121,10 +117,9 @@ describe("createSongUrlResolver", () => {
 
     const resolveSongUrl = createSongUrlResolver({
       apiBase: "http://127.0.0.1:3000",
-      songId: "1496089152",
       fetchImpl
     });
 
-    await expect(resolveSongUrl()).rejects.toThrow("后端未返回歌曲 URL");
+    await expect(resolveSongUrl(1004)).rejects.toThrow("后端未返回歌曲 URL");
   });
 });

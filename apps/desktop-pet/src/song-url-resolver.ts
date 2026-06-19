@@ -5,7 +5,6 @@ type FetchLike = (
 
 type SongUrlResolverOptions = {
   apiBase: string;
-  songId: string;
   fetchImpl?: FetchLike;
 };
 
@@ -89,13 +88,13 @@ export function createSongUrlResolver(options: SongUrlResolverOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const apiBase = options.apiBase.trim().replace(/\/+$/, "");
 
-  return async (): Promise<string> => {
+  return async (songId: string | number): Promise<string> => {
     if (!apiBase) {
       throw new Error("请求失败：未配置 VITE_MUSIC_API_BASE");
     }
 
     const requestUrl = new URL("/song/url/v1", `${apiBase}/`);
-    requestUrl.searchParams.set("id", options.songId);
+    requestUrl.searchParams.set("id", String(songId));
     requestUrl.searchParams.set("level", "exhigh");
     requestUrl.searchParams.set("unblock", "true");
 

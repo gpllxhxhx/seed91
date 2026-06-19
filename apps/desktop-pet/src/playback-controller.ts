@@ -5,6 +5,11 @@ type AudioLike = EventTarget & {
   pause: () => void;
 };
 
+export type PlaybackSong = {
+  id: number | string;
+  name: string;
+};
+
 type PlaybackRefs = {
   stage: {
     dataset: {
@@ -21,7 +26,8 @@ type PlaybackRefs = {
 };
 
 type PlaybackControllerOptions = {
-  resolveSongUrl: () => Promise<string>;
+  resolveSongUrl: (songId: string | number) => Promise<string>;
+  initialSong?: PlaybackSong;
 };
 
 function setPaused(refs: PlaybackRefs): void {
@@ -71,8 +77,10 @@ export function createPlaybackController(
   refs: PlaybackRefs,
   options: PlaybackControllerOptions
 ) {
-  let cachedSongUrl = "";
+  let currentSong: PlaybackSong | null = options.initialSong ?? null;
+  const songUrlCache = new Map<string, string>();
   let pendingSongUrl: Promise<string> | null = null;
+  let pendingSongId = "";
   let isToggling = false;
 
   setPaused(refs);
@@ -96,16 +104,33 @@ export function createPlaybackController(
     showError(refs, "播放失败：当前歌曲 URL 无法播放");
   });
 
+  function getCurrentSongId(): string {
+    if (!currentSong) {
+      return "";
+    }
+
+    return String(currentSong.id);
+  }
+
   async function ensureSongUrl(): Promise<string> {
+    const currentSongId = getCurrentSongId();
+
+    if (!currentSongId) {
+      throw new Error("请先选择歌曲");
+    }
+
+    const cachedSongUrl = songUrlCache.get(currentSongId);
+
     if (cachedSongUrl) {
       return cachedSongUrl;
     }
 
-    if (!pendingSongUrl) {
+    if (!pendingSongUrl || pendingSongId !== currentSongId) {
       setLoading(refs);
       clearError(refs);
+      pendingSongId = currentSongId;
 
-      pendingSongUrl = options.resolveSongUrl()
+      pendingSongUrl = options.resolveSongUrl(currentSongId)
         .then((resolvedSongUrl) => {
           const normalizedSongUrl = resolvedSongUrl.trim();
 
@@ -117,18 +142,57 @@ export function createPlaybackController(
             throw new Error("后端返回的歌曲 URL 无效");
           }
 
-          cachedSongUrl = normalizedSongUrl;
+          songUrlCache.set(currentSongId, normalizedSongUrl);
           return normalizedSongUrl;
         })
         .finally(() => {
           pendingSongUrl = null;
+          pendingSongId = "";
         });
     }
 
     return pendingSongUrl;
   }
 
+  async function startPlaybackForCurrentSong(): Promise<void> {
+    const songUrl = await ensureSongUrl();
+
+    if (audio.src !== songUrl) {
+      audio.src = songUrl;
+    }
+
+    try {
+      await audio.play();
+    } catch (error) {
+      throw new Error(
+        `播放失败：${getErrorMessage(error, "无法播放当前歌曲")}`
+      );
+    }
+  }
+
   return {
+    getCurrentSong(): PlaybackSong | null {
+      return currentSong;
+    },
+    async playSong(song: PlaybackSong): Promise<void> {
+      currentSong = song;
+
+      if (!audio.paused) {
+        audio.pause();
+      }
+
+      isToggling = true;
+      clearError(refs);
+
+      try {
+        await startPlaybackForCurrentSong();
+      } catch (error) {
+        setPaused(refs);
+        showError(refs, getErrorMessage(error, "播放失败：无法播放当前歌曲"));
+      } finally {
+        isToggling = false;
+      }
+    },
     async togglePlayback(): Promise<void> {
       if (isToggling) {
         return;
@@ -139,19 +203,7 @@ export function createPlaybackController(
         clearError(refs);
 
         try {
-          const songUrl = await ensureSongUrl();
-
-          if (audio.src !== songUrl) {
-            audio.src = songUrl;
-          }
-
-          try {
-            await audio.play();
-          } catch (error) {
-            throw new Error(
-              `播放失败：${getErrorMessage(error, "无法播放当前歌曲")}`
-            );
-          }
+          await startPlaybackForCurrentSong();
         } catch (error) {
           setPaused(refs);
           showError(refs, getErrorMessage(error, "播放失败：无法播放当前歌曲"));
