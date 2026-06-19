@@ -14,9 +14,13 @@
       {
         "label": "main",
         "title": "Music Pet Desktop",
-        "width": 900,
-        "height": 640,
-        "transparent": false
+        "width": 220,
+        "height": 260,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "shadow": false
       }
     ],
     "security": {
@@ -27,4 +31,3 @@
     "active": false
   }
 }
-

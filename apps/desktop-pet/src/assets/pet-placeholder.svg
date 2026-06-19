@@ -1,0 +1,54 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="190"
+  height="220"
+  viewBox="0 0 190 220"
+  fill="none"
+>
+  <ellipse cx="95" cy="202" rx="54" ry="12" fill="#00000022" />
+  <path
+    d="M47 67C47 40.49 68.49 19 95 19C121.51 19 143 40.49 143 67V135C143 161.51 121.51 183 95 183C68.49 183 47 161.51 47 135V67Z"
+    fill="#22C55E"
+  />
+  <path
+    d="M66 34L80 8L96 33"
+    fill="#16A34A"
+  />
+  <path
+    d="M124 34L110 8L94 33"
+    fill="#16A34A"
+  />
+  <path
+    d="M66 34L80 8L96 33"
+    stroke="#14532D"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="6"
+  />
+  <path
+    d="M124 34L110 8L94 33"
+    stroke="#14532D"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="6"
+  />
+  <circle cx="77" cy="84" r="8" fill="#14532D" />
+  <circle cx="113" cy="84" r="8" fill="#14532D" />
+  <path
+    d="M95 94L88 107H102L95 94Z"
+    fill="#14532D"
+  />
+  <path
+    d="M77 124C83 133.33 89 138 95 138C101 138 107 133.33 113 124"
+    stroke="#14532D"
+    stroke-linecap="round"
+    stroke-width="6"
+  />
+  <path
+    d="M69 154C79.67 160 88.33 163 95 163C101.67 163 110.33 160 121 154"
+    stroke="#14532D"
+    stroke-linecap="round"
+    stroke-width="6"
+  />
+</svg>
+
