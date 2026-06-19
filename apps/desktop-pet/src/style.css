@@ -98,6 +98,15 @@ body {
   display: none;
 }
 
+.pet-stage[data-playback-state="loading"] .pet-image {
+  opacity: 0.9;
+  filter: drop-shadow(0 10px 18px rgba(37, 99, 235, 0.24));
+}
+
+.pet-stage[data-playback-state="loading"] .playback-status {
+  background: rgba(37, 99, 235, 0.82);
+}
+
 .pet-stage[data-playback-state="playing"] .pet-image {
   transform: translateY(-2px);
   filter: drop-shadow(0 10px 18px rgba(34, 197, 94, 0.28));

@@ -3,6 +3,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { renderApp } from "./App";
 import { bindPetWindowInteractions } from "./pet-window";
 import { createPlaybackController } from "./playback-controller";
+import { createSongUrlResolver } from "./song-url-resolver";
+
+const TEST_SONG_ID = "1496089152";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 
@@ -28,7 +31,11 @@ if (!petStage || !playbackStatus || !playbackError) {
 const playbackStageElement = petStage;
 const playbackStatusElement = playbackStatus;
 const playbackErrorElement = playbackError;
-const testAudio = new Audio("/audio/test-song.mp3");
+const testAudio = new Audio();
+const resolveSongUrl = createSongUrlResolver({
+  apiBase: import.meta.env.VITE_MUSIC_API_BASE ?? "",
+  songId: TEST_SONG_ID
+});
 
 testAudio.preload = "auto";
 
@@ -36,6 +43,8 @@ const playbackController = createPlaybackController(testAudio, {
   stage: playbackStageElement,
   status: playbackStatusElement,
   error: playbackErrorElement
+}, {
+  resolveSongUrl
 });
 
 bindPetWindowInteractions(
