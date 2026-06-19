@@ -15,20 +15,45 @@ function createMouseLikeEvent(type: string, properties: Record<string, unknown>)
 }
 
 describe("bindPetWindowInteractions", () => {
-  it("starts dragging when the pet surface is left-clicked", async () => {
+  it("toggles playback when left click movement stays within 4px", async () => {
     const target = new EventTarget();
     const startDragging = vi.fn(async () => {});
     const closeWindow = vi.fn(async () => {});
+    const togglePlayback = vi.fn();
 
-    const event = createMouseLikeEvent("mousedown", { button: 0, buttons: 1, detail: 1 });
+    bindPetWindowInteractions(target, {
+      startDragging,
+      closeWindow,
+      togglePlayback
+    });
+    target.dispatchEvent(createMouseLikeEvent("mousedown", { button: 0, buttons: 1, clientX: 10, clientY: 10 }));
+    target.dispatchEvent(createMouseLikeEvent("mouseup", { button: 0, buttons: 0, clientX: 12, clientY: 13 }));
 
-    bindPetWindowInteractions(target, startDragging, closeWindow);
-    const dispatchResult = target.dispatchEvent(event);
+    expect(togglePlayback).toHaveBeenCalledTimes(1);
+    expect(startDragging).not.toHaveBeenCalled();
+    expect(closeWindow).not.toHaveBeenCalled();
+  });
+
+  it("starts dragging and does not toggle playback when left click movement exceeds 4px", async () => {
+    const target = new EventTarget();
+    const startDragging = vi.fn(async () => {});
+    const closeWindow = vi.fn(async () => {});
+    const togglePlayback = vi.fn();
+    const moveEvent = createMouseLikeEvent("mousemove", { clientX: 18, clientY: 18 });
+
+    bindPetWindowInteractions(target, {
+      startDragging,
+      closeWindow,
+      togglePlayback
+    });
+    target.dispatchEvent(createMouseLikeEvent("mousedown", { button: 0, buttons: 1, clientX: 10, clientY: 10 }));
+    target.dispatchEvent(moveEvent);
+    target.dispatchEvent(createMouseLikeEvent("mouseup", { button: 0, buttons: 0, clientX: 18, clientY: 18 }));
 
     await Promise.resolve();
 
-    expect(dispatchResult).toBe(false);
     expect(startDragging).toHaveBeenCalledTimes(1);
+    expect(togglePlayback).not.toHaveBeenCalled();
     expect(closeWindow).not.toHaveBeenCalled();
   });
 
@@ -36,9 +61,14 @@ describe("bindPetWindowInteractions", () => {
     const target = new EventTarget();
     const startDragging = vi.fn(async () => {});
     const closeWindow = vi.fn(async () => {});
+    const togglePlayback = vi.fn();
     const event = createMouseLikeEvent("contextmenu", { button: 2 });
 
-    bindPetWindowInteractions(target, startDragging, closeWindow);
+    bindPetWindowInteractions(target, {
+      startDragging,
+      closeWindow,
+      togglePlayback
+    });
     const dispatchResult = target.dispatchEvent(event);
 
     await Promise.resolve();
@@ -46,5 +76,6 @@ describe("bindPetWindowInteractions", () => {
     expect(dispatchResult).toBe(false);
     expect(closeWindow).toHaveBeenCalledTimes(1);
     expect(startDragging).not.toHaveBeenCalled();
+    expect(togglePlayback).not.toHaveBeenCalled();
   });
 });
