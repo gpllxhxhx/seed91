@@ -31,7 +31,10 @@ class PlayerWindow {
       },
     });
 
-    this.window.once('ready-to-show', () => this.window.show());
+    this.window.once('ready-to-show', () => {
+      this.logger?.info('player window ready');
+      this.window.show();
+    });
     this.window.on('close', (event) => {
       if (!this.app.isQuitting) {
         event.preventDefault();
@@ -53,8 +56,13 @@ class PlayerWindow {
         if (EXTERNAL_URL_ALLOWLIST.some((pattern) => pattern.test(url))) shell.openExternal(url);
       }
     });
+    this.window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      this.logger?.error('player window failed to load', { errorCode, errorDescription, validatedURL });
+    });
 
-    this.window.loadURL(this.frontendUrl);
+    this.window.loadURL(this.frontendUrl).catch((error) => {
+      this.logger?.error('player window loadURL failed', { error: error?.stack || error?.message || String(error) });
+    });
     return this.window;
   }
 

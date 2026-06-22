@@ -2,11 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_CONFIG = {
+  window: {
+    x: null,
+    y: null,
+    alwaysOnTop: true,
+    opacity: 1,
+  },
   pet: {
-    x: 100,
-    y: 100,
     locked: false,
     skin: 'default',
+    selectedSkin: 'default',
+    size: 1,
   },
   lyric: {
     visible: true,
@@ -18,6 +24,10 @@ const DEFAULT_CONFIG = {
   },
   player: {
     volume: 0.8,
+    muted: false,
+    lastSong: null,
+    lastPlaylist: null,
+    progress: 0,
   },
 };
 
@@ -33,26 +43,53 @@ function mergeConfig(base, next) {
   return output;
 }
 
+function cloneConfig(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeLoadedConfig(rawConfig) {
+  const merged = mergeConfig(DEFAULT_CONFIG, rawConfig || {});
+  const legacyPetConfig = rawConfig?.pet || {};
+
+  if (Number.isFinite(legacyPetConfig.x) && !Number.isFinite(merged.window.x)) merged.window.x = legacyPetConfig.x;
+  if (Number.isFinite(legacyPetConfig.y) && !Number.isFinite(merged.window.y)) merged.window.y = legacyPetConfig.y;
+  if (legacyPetConfig.skin && !merged.pet.selectedSkin) merged.pet.selectedSkin = legacyPetConfig.skin;
+  if (merged.pet.selectedSkin && !merged.pet.skin) merged.pet.skin = merged.pet.selectedSkin;
+  if (merged.pet.skin && !merged.pet.selectedSkin) merged.pet.selectedSkin = merged.pet.skin;
+
+  return merged;
+}
+
 class ConfigStore {
   constructor(app, logger) {
     this.app = app;
     this.logger = logger;
-    this.filePath = path.join(app.getPath('userData'), 'desktop-pet-config.json');
-    this.data = DEFAULT_CONFIG;
+    this.filePath = path.join(app.getPath('userData'), 'user-config.json');
+    this.legacyFilePath = path.join(app.getPath('userData'), 'desktop-pet-config.json');
+    this.data = cloneConfig(DEFAULT_CONFIG);
+    this.lastLoadUsedDefaults = false;
   }
 
   load() {
+    this.lastLoadUsedDefaults = false;
     try {
-      if (fs.existsSync(this.filePath)) {
-        const raw = fs.readFileSync(this.filePath, 'utf-8');
-        this.data = mergeConfig(DEFAULT_CONFIG, JSON.parse(raw));
+      const targetPath = fs.existsSync(this.filePath)
+        ? this.filePath
+        : (fs.existsSync(this.legacyFilePath) ? this.legacyFilePath : this.filePath);
+
+      if (fs.existsSync(targetPath)) {
+        const raw = fs.readFileSync(targetPath, 'utf-8');
+        this.data = normalizeLoadedConfig(JSON.parse(raw));
+        if (targetPath !== this.filePath) this.save();
       } else {
-        this.data = DEFAULT_CONFIG;
+        this.data = cloneConfig(DEFAULT_CONFIG);
         this.save();
       }
     } catch (err) {
       this.logger?.warn('config read failed, using defaults', { error: err.message });
-      this.data = DEFAULT_CONFIG;
+      this.data = cloneConfig(DEFAULT_CONFIG);
+      this.lastLoadUsedDefaults = true;
+      this.save();
     }
     return this.data;
   }
@@ -62,9 +99,15 @@ class ConfigStore {
   }
 
   update(section, patch) {
-    this.data = mergeConfig(this.data, { [section]: patch });
+    this.data = normalizeLoadedConfig(mergeConfig(this.data, { [section]: patch }));
     this.save();
     return this.data[section];
+  }
+
+  merge(patch) {
+    this.data = normalizeLoadedConfig(mergeConfig(this.data, patch || {}));
+    this.save();
+    return this.data;
   }
 
   save() {
@@ -77,4 +120,4 @@ class ConfigStore {
   }
 }
 
-module.exports = { ConfigStore, DEFAULT_CONFIG };
+module.exports = { ConfigStore, DEFAULT_CONFIG, normalizeLoadedConfig };

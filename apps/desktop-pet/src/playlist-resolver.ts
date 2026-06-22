@@ -13,13 +13,19 @@ export type PlaylistSong = {
 export type ResolvedPlaylist = {
   id: string;
   name: string;
+  cover?: string;
   songs: PlaylistSong[];
 };
 
 type PlaylistResolverOptions = {
   apiBase: string;
   fetchImpl?: FetchLike;
+  timeoutMs?: number;
 };
+
+type PlaylistRequestPath = "/playlist/detail" | "/playlist/track/all";
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
 function extractErrorDetail(body: unknown): string {
   if (!body) {
@@ -113,6 +119,10 @@ function normalizeSongs(tracks: unknown): PlaylistSong[] {
     .filter((song): song is PlaylistSong => Boolean(song));
 }
 
+function normalizeCover(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function parsePlaylistId(rawInput: string): string {
   const input = rawInput.trim();
 
@@ -126,31 +136,62 @@ export function parsePlaylistId(rawInput: string): string {
     return idMatch[1];
   }
 
+  const pathMatch = input.match(/\/playlist\/(\d{1,20})(?:[/?#]|$)/i);
+
+  if (pathMatch) {
+    return pathMatch[1];
+  }
+
   throw new Error("无法解析歌单 ID");
 }
 
 export function createPlaylistResolver(options: PlaylistResolverOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const apiBase = options.apiBase.trim().replace(/\/+$/, "");
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
 
-  return async (rawInput: string): Promise<ResolvedPlaylist> => {
+  async function requestPlaylistPayload(
+    path: PlaylistRequestPath,
+    searchParams: Record<string, string>
+  ): Promise<unknown> {
     if (!apiBase) {
       throw new Error("请求失败：未配置 VITE_MUSIC_API_BASE");
     }
 
-    const playlistId = parsePlaylistId(rawInput);
-    const requestUrl = new URL("/playlist/detail", `${apiBase}/`);
-    requestUrl.searchParams.set("id", playlistId);
+    const requestUrl = new URL(path, `${apiBase}/`);
+    Object.entries(searchParams).forEach(([key, value]) => {
+      requestUrl.searchParams.set(key, value);
+    });
 
     let response: Response;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
     try {
-      response = await fetchImpl(requestUrl.toString(), {
-        cache: "no-store",
-        method: "GET"
-      });
-    } catch {
+      response = await Promise.race([
+        fetchImpl(requestUrl.toString(), {
+          cache: "no-store",
+          method: "GET"
+        }),
+        new Promise<Response>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new Error("请求超时：后端响应过慢"));
+          }, timeoutMs);
+        })
+      ]);
+    } catch (error) {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+
+      if (error instanceof Error && error.message.includes("请求超时")) {
+        throw error;
+      }
+
       throw new Error(`请求失败：无法连接后端或被跨域策略拦截 (${apiBase})`);
+    }
+
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
     }
 
     const body = await readResponseBody(response);
@@ -164,9 +205,53 @@ export function createPlaylistResolver(options: PlaylistResolverOptions) {
       );
     }
 
+    return body;
+  }
+
+  async function fetchPlaylistTracks(
+    playlistId: string,
+    totalHint: number
+  ): Promise<PlaylistSong[]> {
+    const limit = 1000;
+    let offset = 0;
+    const songs: PlaylistSong[] = [];
+
+    while (true) {
+      const body = await requestPlaylistPayload("/playlist/track/all", {
+        id: playlistId,
+        limit: String(limit),
+        offset: String(offset)
+      });
+      const pageSongs = normalizeSongs((body as { songs?: unknown }).songs);
+
+      songs.push(...pageSongs);
+
+      if (pageSongs.length < limit) {
+        break;
+      }
+
+      offset += pageSongs.length;
+
+      if (totalHint > 0 && songs.length >= totalHint) {
+        break;
+      }
+    }
+
+    return songs;
+  }
+
+  return async (rawInput: string): Promise<ResolvedPlaylist> => {
+    const playlistId = parsePlaylistId(rawInput);
+    const body = await requestPlaylistPayload("/playlist/detail", {
+      id: playlistId
+    });
+
     const payload = body as {
       playlist?: {
         name?: unknown;
+        coverImgUrl?: unknown;
+        picUrl?: unknown;
+        trackCount?: unknown;
         tracks?: unknown;
       };
     };
@@ -174,7 +259,29 @@ export function createPlaylistResolver(options: PlaylistResolverOptions) {
       typeof payload.playlist?.name === "string"
         ? payload.playlist.name.trim()
         : "未命名歌单";
-    const songs = normalizeSongs(payload.playlist?.tracks);
+    const detailSongs = normalizeSongs(payload.playlist?.tracks);
+    const trackCount = Number(payload.playlist?.trackCount);
+    const shouldFetchFullTracks =
+      detailSongs.length === 0 ||
+      (Number.isFinite(trackCount) && trackCount > detailSongs.length);
+    let songs = detailSongs;
+
+    if (shouldFetchFullTracks) {
+      try {
+        const fullSongs = await fetchPlaylistTracks(
+          playlistId,
+          Number.isFinite(trackCount) ? trackCount : 0
+        );
+
+        if (fullSongs.length > 0) {
+          songs = fullSongs;
+        }
+      } catch (error) {
+        if (detailSongs.length === 0) {
+          throw error;
+        }
+      }
+    }
 
     if (songs.length === 0) {
       throw new Error("歌单为空");
@@ -183,6 +290,9 @@ export function createPlaylistResolver(options: PlaylistResolverOptions) {
     return {
       id: playlistId,
       name: playlistName || "未命名歌单",
+      cover:
+        normalizeCover(payload.playlist?.coverImgUrl) ||
+        normalizeCover(payload.playlist?.picUrl),
       songs
     };
   };

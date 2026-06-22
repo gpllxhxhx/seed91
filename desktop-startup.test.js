@@ -7,22 +7,26 @@ function read(relativePath) {
   return fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
 }
 
-test('desktop scripts use the Windows bootstrap wrapper instead of bare node commands', () => {
+test('formal desktop scripts point to the Tauri desktop pet', () => {
   const pkg = JSON.parse(read('package.json'));
 
-  assert.equal(pkg.scripts.desktop, 'scripts\\desktop-dev.cmd');
-  assert.equal(pkg.scripts['desktop:dev'], 'scripts\\desktop-dev.cmd');
+  assert.equal(pkg.scripts.desktop, 'npm --prefix apps/desktop-pet run tauri -- dev');
+  assert.equal(pkg.scripts['desktop:dev'], 'npm --prefix apps/desktop-pet run tauri -- dev');
+  assert.equal(pkg.scripts['desktop:build'], 'npm --prefix apps/desktop-pet run tauri -- build');
+  assert.equal(pkg.scripts['desktop:legacy'], undefined);
+  assert.equal(pkg.scripts['desktop:electron:legacy'], undefined);
+  assert.equal(pkg.scripts['desktop:electron:legacy:build'], undefined);
 });
 
-test('desktop bootstrap wrapper clears Electron node mode and delegates to the shared node wrapper', () => {
-  const source = read('scripts/desktop-dev.cmd');
-  const sharedWrapper = read('scripts/run-node-script.cmd');
+test('old Electron launcher files are retired from the formal toolchain', () => {
+  assert.equal(fs.existsSync(path.join(__dirname, 'scripts', 'desktop-dev.cmd')), false);
+  assert.equal(fs.existsSync(path.join(__dirname, 'scripts', 'desktop-dev.cjs')), false);
+  assert.equal(fs.existsSync(path.join(__dirname, 'electron-builder.legacy.json')), false);
 
-  assert.match(source, /set\s+ELECTRON_RUN_AS_NODE=/i);
-  assert.match(source, /run-node-script\.cmd/i);
-  assert.match(source, /desktop-dev\.cjs/i);
-  assert.match(sharedWrapper, /npm_node_execpath/i);
-  assert.match(sharedWrapper, /set\s+"NODE_EXE=/i);
+  const pkg = JSON.parse(read('package.json'));
+
+  assert.equal(pkg.devDependencies?.electron, undefined);
+  assert.equal(pkg.devDependencies?.['electron-builder'], undefined);
 });
 
 test('resolveNodeExecPath prefers npm_node_execpath before process execPath and node fallback', () => {
@@ -36,12 +40,10 @@ test('resolveNodeExecPath prefers npm_node_execpath before process execPath and 
   assert.equal(resolveNodeExecPath({}, ''), 'node');
 });
 
-test('desktop and API launchers resolve child runtimes without assuming node is in PATH', () => {
-  const desktopDev = read('scripts/desktop-dev.cjs');
+test('API launchers resolve child runtimes without assuming node is in PATH', () => {
   const apiStart = read('scripts/start-api-enhanced.cjs');
   const apiService = read('desktop/main/services/api-process-service.cjs');
 
-  assert.match(desktopDev, /resolveNodeExecPath/);
   assert.match(apiStart, /resolveNodeExecPath/);
   assert.match(apiService, /resolveNodeExecPath/);
 });

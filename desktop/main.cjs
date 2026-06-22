@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 
 const { ApiProcessService, HOST } = require('./main/services/api-process-service.cjs');
@@ -27,8 +28,48 @@ let petWindow = null;
 let lyricWindow = null;
 let playerWindow = null;
 let tray = null;
+let cleanupStarted = false;
 
 app.isQuitting = false;
+
+function serializeError(error) {
+  if (!error) return 'unknown error';
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+
+function getEnvironmentInfo() {
+  return {
+    platform: process.platform,
+    arch: process.arch,
+    nodeVersion: process.version,
+    electronVersion: process.versions.electron,
+    chromeVersion: process.versions.chrome,
+    hostname: os.hostname(),
+    isPackaged: Boolean(app.isPackaged),
+    appPath: app.getAppPath(),
+    userDataPath: app.getPath('userData'),
+  };
+}
+
+function showFriendlyRuntimeError(title, message, detail) {
+  if (!app.isReady()) return;
+  const safeMessage = String(message || '程序遇到错误，请稍后重试。');
+  const safeDetail = String(detail || '');
+  dialog.showMessageBox({
+    type: 'error',
+    title,
+    message: safeMessage,
+    detail: safeDetail,
+    buttons: ['知道了'],
+    noLink: true,
+  }).catch(() => {});
+}
+
+function logUnhandledError(scope, error) {
+  const details = { scope, error: serializeError(error) };
+  logger?.error('unhandled runtime error', details);
+}
 
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -103,7 +144,13 @@ function createFrontendServer() {
         'Content-Type': getMimeType(filePath),
         'Cache-Control': 'no-cache',
       });
-      fs.createReadStream(filePath).pipe(res);
+      const stream = fs.createReadStream(filePath);
+      stream.on('error', (error) => {
+        logger?.error('frontend resource stream failed', { filePath, error: serializeError(error) });
+        if (!res.headersSent) res.writeHead(500);
+        res.end('Resource load failed');
+      });
+      stream.pipe(res);
     });
   });
 
@@ -175,26 +222,55 @@ function ensurePlayerForCommand() {
   if (!playerWindow.window.webContents.isLoadingMainFrame()) return;
 }
 
+function registerIpcHandler(channel, handler) {
+  ipcMain.handle(channel, async (event, ...args) => {
+    logger?.info('ipc invoke received', { channel });
+    try {
+      return await handler(event, ...args);
+    } catch (error) {
+      logger?.error('ipc invoke failed', { channel, error: serializeError(error) });
+      throw error;
+    }
+  });
+}
+
 function setupIpc() {
-  ipcMain.handle('playback:get-state', () => playbackService.getState());
-  ipcMain.handle('pet:get-package', () => ({
+  registerIpcHandler('playback:get-state', () => playbackService.getState());
+  registerIpcHandler('pet:get-package', () => ({
     manifest: petPackage?.manifest || null,
     assetBaseUrl: petPackage?.assetBaseUrl || '',
   }));
-  ipcMain.handle('playback:toggle', () => actions.togglePlayback());
-  ipcMain.handle('playback:play', () => playbackService.play());
-  ipcMain.handle('playback:pause', () => playbackService.pause());
-  ipcMain.handle('playback:next', () => actions.next());
-  ipcMain.handle('playback:previous', () => actions.previous());
-  ipcMain.handle('playback:seek', (_event, seconds) => playbackService.seek(Number(seconds)));
-  ipcMain.handle('player:open', () => actions.openPlayer());
-  ipcMain.handle('lyric:get-config', () => configStore.get('lyric'));
-  ipcMain.handle('lyric:toggle', () => actions.toggleLyric());
-  ipcMain.handle('lyric:show', () => lyricWindow.show());
-  ipcMain.handle('lyric:hide', () => lyricWindow.hide());
-  ipcMain.handle('lyric:lock', () => lyricWindow.setLocked(true));
-  ipcMain.handle('lyric:unlock', () => lyricWindow.setLocked(false));
-  ipcMain.handle('app:quit', () => actions.quit());
+  registerIpcHandler('playback:toggle', () => actions.togglePlayback());
+  registerIpcHandler('playback:play', () => playbackService.play());
+  registerIpcHandler('playback:pause', () => playbackService.pause());
+  registerIpcHandler('playback:next', () => actions.next());
+  registerIpcHandler('playback:previous', () => actions.previous());
+  registerIpcHandler('playback:seek', (_event, seconds) => playbackService.seek(Number(seconds)));
+  registerIpcHandler('player:open', () => actions.openPlayer());
+  registerIpcHandler('lyric:get-config', () => configStore.get('lyric'));
+  registerIpcHandler('lyric:toggle', () => actions.toggleLyric());
+  registerIpcHandler('lyric:show', () => lyricWindow.show());
+  registerIpcHandler('lyric:hide', () => lyricWindow.hide());
+  registerIpcHandler('lyric:lock', () => lyricWindow.setLocked(true));
+  registerIpcHandler('lyric:unlock', () => lyricWindow.setLocked(false));
+  registerIpcHandler('app:quit', () => actions.quit());
+  registerIpcHandler('desktop:config:get', () => configStore.get());
+  registerIpcHandler('desktop:config:update', (_event, patch) => {
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      throw new Error('配置更新参数无效');
+    }
+    return configStore.merge(patch);
+  });
+
+  ipcMain.on('desktop:log:report', (_event, entry) => {
+    const level = entry?.level === 'error' ? 'error' : (entry?.level === 'warn' ? 'warn' : 'info');
+    const message = entry?.message || 'renderer log';
+    const meta = {
+      scope: entry?.scope || 'renderer',
+      ...(entry?.meta ? { meta: entry.meta } : {}),
+    };
+    logger?.[level]?.(`renderer: ${message}`, meta);
+  });
 
   ipcMain.on('player:state-update', (_event, state) => {
     playbackService.updateFromRenderer(state || {});
@@ -209,10 +285,10 @@ function wirePlayback() {
 
   playbackService.on('command', (payload) => {
     const sent = playerWindow?.send('playback:command', payload);
-    if (!sent) {
-      logger?.warn('playback command dropped because player window is not ready', payload);
-      playerWindow.show();
-    }
+  if (!sent) {
+    logger?.warn('playback command dropped because player window is not ready', payload);
+    playerWindow.show();
+  }
   });
 }
 
@@ -257,9 +333,10 @@ async function bootstrap() {
   });
   const apiInfo = await apiService.start();
   apiBaseUrl = apiInfo.baseUrl;
+  logger.info('desktop api base url ready', { apiBaseUrl });
   petPackage = loadPetPackage({
     app,
-    petId: configStore.get('pet')?.skin || 'default',
+    petId: configStore.get('pet')?.selectedSkin || configStore.get('pet')?.skin || 'default',
   });
 
   playerWindow = new PlayerWindow({
@@ -281,8 +358,11 @@ async function bootstrap() {
 }
 
 function cleanup() {
+  if (cleanupStarted) return;
+  cleanupStarted = true;
   app.isQuitting = true;
   logger?.info('cleanup started');
+  petWindow?.savePosition?.();
   if (frontendServer) {
     frontendServer.close();
     frontendServer = null;
@@ -304,8 +384,12 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   logger = new Logger(app);
   logger.init();
+  logger.info('desktop app starting', getEnvironmentInfo());
   configStore = new ConfigStore(app, logger);
   configStore.load();
+  if (configStore.lastLoadUsedDefaults) {
+    showFriendlyRuntimeError('Music Pet 配置提示', '本地配置读取失败，已使用默认设置。');
+  }
   playbackService = new PlaybackService(logger);
 
   bootstrap().catch((err) => {
@@ -318,9 +402,39 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
+  logger?.info('before-quit received');
   cleanup();
 });
-process.on('exit', cleanup);
+app.on('render-process-gone', (_event, webContents, details) => {
+  logger?.error('render process gone', {
+    reason: details?.reason,
+    exitCode: details?.exitCode,
+    url: webContents?.getURL?.(),
+  });
+  showFriendlyRuntimeError('Music Pet 运行异常', '渲染进程意外退出，请重新打开软件。', `${details?.reason || 'unknown'} (${details?.exitCode ?? 'n/a'})`);
+});
+app.on('child-process-gone', (_event, details) => {
+  logger?.warn('child process gone', details || {});
+});
+app.on('web-contents-created', (_event, webContents) => {
+  webContents.on('did-fail-load', (_loadEvent, errorCode, errorDescription, validatedURL) => {
+    logger?.error('web contents did-fail-load', { errorCode, errorDescription, validatedURL });
+  });
+  webContents.on('unresponsive', () => {
+    logger?.warn('web contents unresponsive', { url: webContents.getURL?.() });
+  });
+});
+process.on('uncaughtException', (error) => {
+  logUnhandledError('uncaughtException', error);
+  showFriendlyRuntimeError('Music Pet 遇到错误', '程序出现未处理异常，请重新打开软件。', serializeError(error));
+});
+process.on('unhandledRejection', (reason) => {
+  logUnhandledError('unhandledRejection', reason);
+});
+process.on('exit', (code) => {
+  logger?.info('process exit', { code, exitedAt: new Date().toISOString() });
+  cleanup();
+});
 process.on('SIGINT', () => {
   cleanup();
   app.quit();

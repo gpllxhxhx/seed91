@@ -2,72 +2,27 @@
   "name": "music-pet-client",
   "version": "0.1.0",
   "private": true,
-  "description": "Static music web client for NeteaseCloudMusicApiEnhanced.",
-  "main": "desktop/main.cjs",
+  "description": "Static music web client and Tauri desktop pet for NeteaseCloudMusicApiEnhanced.",
   "scripts": {
     "start": "scripts\\run-node-script.cmd app.js",
     "frontend": "scripts\\run-node-script.cmd app.js",
     "api": "scripts\\run-node-script.cmd scripts\\start-api-enhanced.cjs",
-    "desktop": "scripts\\desktop-dev.cmd",
-    "desktop:dev": "scripts\\desktop-dev.cmd",
-    "desktop:build": "scripts\\run-node-script.cmd node_modules\\electron-builder\\cli.js --win nsis --x64",
-    "desktop:installer": "scripts\\run-node-script.cmd node_modules\\electron-builder\\cli.js --win nsis --x64",
-    "desktop:publish-local": "scripts\\run-node-script.cmd scripts\\publish-desktop.cjs",
+    "desktop": "npm --prefix apps/desktop-pet run tauri -- dev",
+    "desktop:dev": "npm --prefix apps/desktop-pet run tauri -- dev",
+    "desktop:tauri": "npm --prefix apps/desktop-pet run tauri -- dev",
+    "desktop:build": "npm --prefix apps/desktop-pet run tauri -- build",
+    "desktop:installer": "npm --prefix apps/desktop-pet run tauri -- build",
+    "desktop:dist": "npm run desktop:build",
+    "desktop:publish-local": "npm run desktop:build && scripts\\run-node-script.cmd scripts\\publish-desktop.cjs",
+    "build": "npm run desktop:build",
+    "dist": "npm run desktop:dist",
+    "clean:check": "node scripts\\clean-worktree.cjs",
+    "clean:dry": "node scripts\\clean-worktree.cjs --dry-run",
+    "clean:apply": "node scripts\\clean-worktree.cjs --apply",
+    "clean:report": "node scripts\\clean-worktree.cjs --report",
+    "clean:node-modules": "node scripts\\clean-worktree.cjs --apply --include-node-modules",
     "deploy:start": "pm2 start ecosystem.config.cjs",
     "deploy:reload": "pm2 reload ecosystem.config.cjs --update-env",
     "deploy:logs": "pm2 logs music-web music-api"
-  },
-  "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
-  },
-  "build": {
-    "appId": "com.musicpet.desktop",
-    "productName": "Music Pet",
-    "asar": false,
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "app.js",
-      "desktop/**/*",
-      "frontend/**/*",
-      "!frontend/downloads/*.exe",
-      "!NeteaseCloudMusicApiEnhanced/precompiled/**/*",
-      "!NeteaseCloudMusicApiEnhanced/test/**/*",
-      "!NeteaseCloudMusicApiEnhanced/.git/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "NeteaseCloudMusicApiEnhanced",
-        "to": "NeteaseCloudMusicApiEnhanced",
-        "filter": [
-          "**/*",
-          "!precompiled/**/*",
-          "!test/**/*",
-          "!.git/**/*"
-        ]
-      }
-    ],
-    "win": {
-      "signAndEditExecutable": false,
-      "verifyUpdateCodeSignature": false,
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "MusicPet-Setup-${version}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Music Pet"
-    }
   }
 }

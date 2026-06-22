@@ -1,4 +1,4 @@
-/* ===== Music Player Controller ===== */
+ d/* ===== Music Player Controller ===== */
 const PLAYER_MODE_KEY = 'music-player:play-mode:v1';
 const PLAYER_VOLUME_KEY = 'music-player:volume:v1';
 const PLAY_MODES = ['list-loop', 'single-loop', 'shuffle'];
@@ -31,8 +31,9 @@ const Player = {
     commentsRequestId: 0,
     detailLyricsVisible: false,
     lastNonZeroVolume: 80,
+    desktopConfigCache: null,
 
-    init() {
+    async init() {
         this.audio = document.getElementById('audio-player');
         this.progressBar = document.getElementById('player-progress-bar');
         this.volumeSlider = document.getElementById('player-volume');
@@ -40,11 +41,17 @@ const Player = {
         if (!this.audio) return;
 
         if (!PLAY_MODES.includes(this.playMode)) this.playMode = 'list-loop';
+        this.desktopConfigCache = await this.readDesktopConfig();
         const storedVolume = Number(localStorage.getItem(PLAYER_VOLUME_KEY));
-        const volume = Number.isFinite(storedVolume) ? Math.max(0, Math.min(100, storedVolume)) : Number(this.volumeSlider?.value || 80);
+        const desktopVolume = Number(this.desktopConfigCache?.player?.volume);
+        const volume = Number.isFinite(desktopVolume)
+            ? Math.round(Math.max(0, Math.min(1, desktopVolume)) * 100)
+            : (Number.isFinite(storedVolume) ? Math.max(0, Math.min(100, storedVolume)) : Number(this.volumeSlider?.value || 80));
         if (volume > 0) this.lastNonZeroVolume = volume;
+        this.audio.muted = Boolean(this.desktopConfigCache?.player?.muted) || volume <= 0;
         this.audio.volume = volume / 100;
         if (this.volumeSlider) this.volumeSlider.value = volume;
+        localStorage.setItem(PLAYER_VOLUME_KEY, String(volume));
 
         this.updateProgressUI(0, 0, 0);
         this.updateRangeFill(this.volumeSlider, volume);
@@ -53,7 +60,80 @@ const Player = {
         this.renderLyrics('未在播放');
         this.bindEvents();
         this.initDesktopBridge();
+        this.restoreLastSongFromDesktopConfig();
         this.publishDesktopState(true);
+    },
+
+    async readDesktopConfig() {
+        try {
+            return await window.musicDesktopPlayer?.config?.get?.() || null;
+        } catch (err) {
+            this.reportLog('warn', 'desktop config read failed', { reason: err?.message || String(err) });
+            return null;
+        }
+    },
+
+    async updateDesktopConfig(patch) {
+        if (!patch || typeof patch !== 'object') return;
+        try {
+            this.desktopConfigCache = await window.musicDesktopPlayer?.config?.update?.(patch) || this.desktopConfigCache;
+        } catch (err) {
+            this.reportLog('warn', 'desktop config update failed', {
+                patch,
+                reason: err?.message || String(err),
+            });
+        }
+    },
+
+    reportLog(level, message, meta = {}) {
+        try {
+            window.musicDesktopPlayer?.reportLog?.({
+                level,
+                message,
+                scope: 'player',
+                meta,
+            });
+        } catch (err) {
+            console.warn('Desktop player log report failed:', err);
+        }
+    },
+
+    notify(message, type = 'success') {
+        if (typeof window.notifyUser === 'function') {
+            window.notifyUser(message, type);
+            return;
+        }
+        if (typeof showToast === 'function') showToast(message, type);
+    },
+
+    restoreLastSongFromDesktopConfig() {
+        const lastSong = this.desktopConfigCache?.player?.lastSong;
+        if (!lastSong || !lastSong.songId) return;
+
+        this.currentSong = {
+            id: Number(lastSong.songId),
+            song_id: String(lastSong.songId),
+            name: lastSong.songName || '未在播放',
+            artists: [{ name: lastSong.artist || '未知艺术家' }],
+            ar: [{ name: lastSong.artist || '未知艺术家' }],
+            coverUrl: lastSong.cover || '',
+            album_cover: lastSong.cover || '',
+        };
+        this.setCurrentSongUI(this.currentSong);
+        this.setPlayerStatus('已恢复上次歌曲信息');
+        this.renderLyrics('未自动播放');
+    },
+
+    buildPersistedLastSong(song, progress = 0) {
+        const normalized = API.normalizeSong ? API.normalizeSong(song) || song : song;
+        if (!normalized) return null;
+        return {
+            songId: normalized.id || normalized.song_id || null,
+            songName: normalized.name || '未知歌曲',
+            artist: this._getArtistText(normalized),
+            cover: normalizePlayerImageUrl(normalized.coverUrl || normalized.album_cover || ''),
+            progress: Number.isFinite(progress) ? progress : 0,
+        };
     },
 
     bindEvents() {
@@ -86,6 +166,12 @@ const Player = {
             localStorage.setItem(PLAYER_VOLUME_KEY, String(volume));
             this.updateRangeFill(this.volumeSlider, volume);
             this.updateVolumeUI();
+            this.updateDesktopConfig({
+                player: {
+                    volume: volume / 100,
+                    muted: this.audio.muted,
+                },
+            });
             this.publishDesktopState(true);
         });
 
@@ -138,6 +224,15 @@ const Player = {
         }
         if (playing) this.startProgressAnimation();
         else this.stopProgressAnimation();
+        if (!playing) {
+            this.updateDesktopConfig({
+                player: {
+                    muted: Boolean(this.audio?.muted),
+                    volume: Number(this.audio?.volume || 0),
+                    lastSong: this.buildPersistedLastSong(this.currentSong, Number(this.audio?.currentTime || 0)),
+                },
+            });
+        }
         this.updateCurrentDetailPlayIcon();
         this.publishDesktopState(true);
     },
@@ -162,6 +257,11 @@ const Player = {
 
     onError(event) {
         console.error('Audio playback error:', event);
+        this.reportLog('error', 'audio element playback error', {
+            songId: this.currentSong?.id || this.currentSong?.song_id || null,
+            readyState: this.audio?.readyState,
+            networkState: this.audio?.networkState,
+        });
         if (this.isLoadingSong) return;
         if (!this.currentSong || this.retryingPlayback) {
             this.showPlaybackFailed();
@@ -189,6 +289,11 @@ const Player = {
         this.isLoadingSong = true;
         this.setCurrentSongUI(this.currentSong);
         this.resetPlaybackState();
+        this.updateDesktopConfig({
+            player: {
+                lastSong: this.buildPersistedLastSong(this.currentSong, 0),
+            },
+        });
         this.publishDesktopState(true);
         this.loadLyrics(songId);
         if (!document.getElementById('comments-panel')?.classList.contains('hidden')) {
@@ -212,16 +317,40 @@ const Player = {
             const played = await this.playLoadedAudio();
             if (requestId !== this.currentRequestId) return;
             if (played) this.setPlayerStatus('');
-            if (typeof showToast === 'function') {
+            this.reportLog('info', 'song audio url resolved', {
+                songId,
+                source: audio.source || '',
+                retrying: Boolean(options.retrying),
+            });
+            if (played) {
+                this.updateDesktopConfig({
+                    player: {
+                        lastSong: this.buildPersistedLastSong(this.currentSong, Number(this.audio?.currentTime || 0)),
+                    },
+                });
+            }
+            if (played) {
                 const sourceText = audio.source ? `（${audio.source}）` : '';
-                showToast(options.retrying ? `已切换音源${sourceText}` : `已获取播放地址${sourceText}`);
+                this.notify(options.retrying ? `已切换音源${sourceText}` : `已获取播放地址${sourceText}`);
             }
         } catch (err) {
             if (requestId !== this.currentRequestId) return;
             console.error('Load audio URL failed:', err);
+            this.reportLog('error', 'song audio url load failed', {
+                songId,
+                songName: normalized?.name || '',
+                retrying: Boolean(options.retrying),
+                reason: err?.message || String(err),
+            });
+            this.playbackError = true;
+            this.isPlaying = false;
             this.clearAudioSource();
-            const message = options.retrying ? '重试失败：播放地址不可用' : (err.message || '获取音源失败');
-            if (typeof showToast === 'function') showToast(message, 'error');
+            const message = options.retrying
+                ? '当前歌曲暂时无法播放，已停止播放。'
+                : (String(err?.message || '').includes('无法连接 API 后端')
+                    ? '网络连接失败，请检查网络后重试。'
+                    : '当前歌曲暂时无法播放，已停止播放。');
+            this.notify(message, 'error');
             this.setPlayerStatus(message);
             this.publishDesktopState(true);
         } finally {
@@ -240,6 +369,11 @@ const Player = {
         } catch (err) {
             if (err?.name === 'NotAllowedError') {
                 this.setPlayerStatus('浏览器已阻止自动播放，点击播放继续');
+                this.reportLog('warn', 'audio playback blocked', {
+                    songId: this.currentSong?.id || this.currentSong?.song_id || null,
+                    reason: err?.message || String(err),
+                });
+                this.notify('当前歌曲已准备好，点击播放按钮继续。', 'error');
                 console.warn('Auto-play blocked:', err);
                 return false;
             }
@@ -259,7 +393,7 @@ const Player = {
             return;
         }
         this.retryingPlayback = true;
-        if (typeof showToast === 'function') showToast(message);
+        this.notify(message);
         await this.loadSong(this.currentSong, { retrying: true, silent: true, sourceStartIndex: nextSourceIndex });
     },
 
@@ -268,8 +402,12 @@ const Player = {
         this.playbackError = true;
         this.stopProgressAnimation();
         this.clearAudioSource();
-        this.setPlayerStatus('播放失败：外链不可用');
-        if (typeof showToast === 'function') showToast('播放失败：外链不可用', 'error');
+        this.reportLog('error', 'song playback failed', {
+            songId: this.currentSong?.id || this.currentSong?.song_id || null,
+            songName: this.currentSong?.name || '',
+        });
+        this.setPlayerStatus('当前歌曲暂时无法播放，已停止播放。');
+        this.notify('当前歌曲暂时无法播放，已停止播放。', 'error');
         this.publishDesktopState(true);
     },
 
@@ -306,6 +444,10 @@ const Player = {
         } else {
             this.audio.play().catch((err) => {
                 console.warn('Play failed:', err);
+                this.reportLog('error', 'resume playback failed', {
+                    songId: this.currentSong?.id || this.currentSong?.song_id || null,
+                    reason: err?.message || String(err),
+                });
                 this.recoverPlayback('播放失败，正在重新获取音源...');
             });
         }
@@ -465,6 +607,13 @@ const Player = {
             this.audio.muted = true;
         }
         this.updateVolumeUI();
+        this.updateDesktopConfig({
+            player: {
+                volume: Number(this.audio.volume || 0),
+                muted: Boolean(this.audio.muted) || Number(this.volumeSlider?.value || 0) <= 0,
+                lastSong: this.buildPersistedLastSong(this.currentSong, Number(this.audio?.currentTime || 0)),
+            },
+        });
         this.publishDesktopState(true);
     },
 
@@ -590,11 +739,18 @@ const Player = {
             if (command === 'setVolume') {
                 const volume = Math.max(0, Math.min(1, Number(payload?.volume || 0)));
                 this.audio.volume = volume;
+                this.audio.muted = volume <= 0;
                 if (this.volumeSlider) {
                     this.volumeSlider.value = Math.round(volume * 100);
                     this.updateRangeFill(this.volumeSlider, Number(this.volumeSlider.value));
                 }
                 this.updateVolumeUI();
+                this.updateDesktopConfig({
+                    player: {
+                        volume,
+                        muted: this.audio.muted,
+                    },
+                });
                 this.publishDesktopState(true);
             }
         });
@@ -617,7 +773,8 @@ const Player = {
             currentTrack: this.toDesktopTrack(this.currentSong),
             currentTime: Number(this.audio?.currentTime || 0),
             duration: Number.isFinite(this.audio?.duration) ? Number(this.audio.duration) : 0,
-            volume: Number(this.audio?.muted ? 0 : this.audio?.volume || 0),
+            volume: Number(this.audio?.volume || 0),
+            muted: Boolean(this.audio?.muted),
             queue: this.playlist.map((song) => this.toDesktopTrack(song)).filter(Boolean),
             currentIndex: this.currentIndex,
             lyricLines: this.hasTimedLyrics

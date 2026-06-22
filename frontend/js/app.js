@@ -33,6 +33,69 @@ function showToast(message, type = 'success') {
     toast._timeout = setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
+window.notifyUser = showToast;
+
+function reportDesktopLog(level, message, meta = {}) {
+    try {
+        window.musicDesktopPlayer?.reportLog?.({
+            level,
+            message,
+            scope: 'app',
+            meta,
+        });
+    } catch (err) {
+        console.warn('Desktop app log report failed:', err);
+    }
+}
+
+async function updateDesktopConfig(patch) {
+    if (!patch || typeof patch !== 'object') return null;
+    try {
+        return await window.musicDesktopPlayer?.config?.update?.(patch) || null;
+    } catch (err) {
+        reportDesktopLog('warn', 'desktop config update failed', {
+            patch,
+            reason: err?.message || String(err),
+        });
+        return null;
+    }
+}
+
+async function readDesktopConfig() {
+    try {
+        return await window.musicDesktopPlayer?.config?.get?.() || null;
+    } catch (err) {
+        reportDesktopLog('warn', 'desktop config read failed', {
+            reason: err?.message || String(err),
+        });
+        return null;
+    }
+}
+
+function installGlobalErrorHandlers() {
+    if (window.__musicPlayerErrorHandlersInstalled) return;
+    window.__musicPlayerErrorHandlersInstalled = true;
+
+    window.addEventListener('error', (event) => {
+        if (event.target && event.target !== window) return;
+        reportDesktopLog('error', 'frontend runtime error', {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            error: event.error?.stack || event.error?.message || '',
+        });
+        showToast('页面运行时出现异常，请稍后重试。', 'error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        reportDesktopLog('error', 'frontend unhandled rejection', {
+            reason: event.reason?.stack || event.reason?.message || String(event.reason || ''),
+        });
+        showToast('操作未完成，请稍后重试。', 'error');
+    });
+}
+
 function showConfirmDialog(message, options = {}) {
     const modal = document.getElementById('modal-confirm');
     const messageEl = document.getElementById('confirm-message');
@@ -306,7 +369,10 @@ async function checkBackend() {
         setApiStatus(`API ${version.version || version.data?.version || '已连接'}`, true);
     } catch (err) {
         setApiStatus('API 未连接', false);
-        showToast(err.message, 'error');
+        reportDesktopLog('error', 'backend health check failed', {
+            reason: err?.message || String(err),
+        });
+        showToast('网络连接失败，请检查网络后重试。', 'error');
     }
 }
 
@@ -899,16 +965,45 @@ async function importPlaylist() {
     statusEl.classList.remove('hidden');
     try {
         const result = await API.importPlaylist(value);
+        if (!result?.id || !result?.name || !Array.isArray(result.songs) || !result.songs.length) {
+            throw new Error('歌单内容为空，请检查歌单是否有效。');
+        }
         statusEl.textContent = `导入成功：${result.name}`;
         statusEl.className = 'import-status success';
         input.value = '';
+        currentPlaylistId = Number(result.id);
+        await updateDesktopConfig({
+            player: {
+                lastPlaylist: {
+                    playlistId: Number(result.id),
+                    playlistName: result.name,
+                },
+            },
+        });
+        reportDesktopLog('info', 'playlist import succeeded', {
+            playlistId: Number(result.id),
+            playlistName: result.name,
+            songCount: result.songs.length,
+        });
         showToast('歌单导入成功');
         await loadPlaylists();
         navigateTo('playlists');
     } catch (err) {
-        statusEl.textContent = `导入失败：${err.message}`;
+        const rawMessage = String(err?.message || '');
+        const friendlyMessage = rawMessage.includes('无法识别歌单 ID')
+            ? '歌单导入失败，请检查歌单 ID 是否正确。'
+            : (rawMessage.includes('歌单内容为空')
+                ? '歌单导入失败，当前歌单暂无可导入歌曲。'
+                : (rawMessage.includes('无法连接 API 后端')
+                    ? '网络连接失败，请检查网络后重试。'
+                    : '歌单导入失败，请检查链接或歌单 ID 是否正确。'));
+        reportDesktopLog('error', 'playlist import failed', {
+            input: value,
+            reason: rawMessage,
+        });
+        statusEl.textContent = `导入失败：${friendlyMessage}`;
         statusEl.className = 'import-status error';
-        showToast(err.message || '导入失败', 'error');
+        showToast(friendlyMessage, 'error');
     } finally {
         btn.disabled = false;
     }
@@ -1197,8 +1292,11 @@ function bindStaticEvents() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    installGlobalErrorHandlers();
     lucide.createIcons();
-    Player.init();
+    const desktopConfig = await readDesktopConfig();
+    currentPlaylistId = Number(desktopConfig?.player?.lastPlaylist?.playlistId || currentPlaylistId || 0) || null;
+    await Player.init();
     bindStaticEvents();
     await checkBackend();
     await loadPlaylists();

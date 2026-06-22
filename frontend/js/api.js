@@ -29,6 +29,19 @@ function nowIso() {
     return new Date().toISOString();
 }
 
+function reportDesktopLog(level, message, meta = {}) {
+    try {
+        window.musicDesktopPlayer?.reportLog?.({
+            level,
+            message,
+            scope: 'api',
+            meta,
+        });
+    } catch (err) {
+        console.warn('Desktop log report failed:', err);
+    }
+}
+
 function buildApiUrl(apiPath) {
     const normalizedPath = String(apiPath || '').replace(/^\/+/, '');
     return new URL(normalizedPath, `${NCM_API_BASE}/`);
@@ -224,13 +237,27 @@ async function request(path, params = {}) {
         const body = contentType.includes('application/json') ? await res.json() : await res.text();
         if (!res.ok) {
             const message = body?.message || body?.msg || body?.detail || res.statusText || `HTTP ${res.status}`;
+            reportDesktopLog('warn', 'API request returned non-ok response', {
+                apiPath: path,
+                status: res.status,
+                message,
+            });
             throw new Error(message);
         }
         return body;
     } catch (err) {
         if (err.name === 'TypeError' || String(err.message).includes('Failed to fetch')) {
+            reportDesktopLog('error', 'API request failed', {
+                apiPath: path,
+                reason: err.message,
+                apiBase: NCM_API_BASE,
+            });
             throw new Error(`无法连接 API 后端：${NCM_API_BASE}`);
         }
+        reportDesktopLog('error', 'API request threw error', {
+            apiPath: path,
+            reason: err.message || String(err),
+        });
         throw err;
     }
 }
@@ -523,6 +550,7 @@ const api = {
         if (!source) throw new Error('歌单不存在或无法获取详情');
         const trackItems = await fetchPlaylistTracks(playlistId, source.trackCount || 0);
         const songs = (trackItems.length ? trackItems : source.tracks || []).map(normalizeSong).filter(Boolean);
+        if (!songs.length) throw new Error('歌单内容为空，请换一个歌单再试');
         return normalizePlaylist({
             id: Number(playlistId),
             name: source.name,
@@ -542,6 +570,9 @@ const api = {
         const playlistId = extractId(urlOrId, 'playlist');
         if (!playlistId) throw new Error('无法识别歌单 ID');
         const playlist = await this.getNeteasePlaylistDetail(playlistId);
+        if (!playlist || !Array.isArray(playlist.songs) || !playlist.songs.length) {
+            throw new Error('歌单内容为空，请换一个歌单再试');
+        }
         return upsertPlaylist({
             ...playlist,
             id: Number(`9${String(playlistId).slice(-12)}`),

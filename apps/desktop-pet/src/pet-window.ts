@@ -3,12 +3,17 @@ type PointerLikeEvent = Event & {
   buttons?: number;
   clientX?: number;
   clientY?: number;
+  deltaY?: number;
 };
 
 type PetWindowCallbacks = {
   startDragging: () => Promise<void> | void;
-  closeWindow: () => Promise<void> | void;
   togglePlayback: () => Promise<void> | void;
+  playNext?: () => Promise<void> | void;
+  playPrevious?: () => Promise<void> | void;
+  changeVolume?: (delta: number) => Promise<void> | void;
+  openContextMenu?: (position: { x: number; y: number }) => Promise<void> | void;
+  setDragging?: (isDragging: boolean) => void;
 };
 
 type DragSession = {
@@ -18,6 +23,8 @@ type DragSession = {
 };
 
 const CLICK_DISTANCE_THRESHOLD = 4;
+const CLICK_CONFIRM_DELAY_MS = 240;
+const VOLUME_STEP = 0.05;
 
 export function bindPetWindowInteractions(
   target: EventTarget,
@@ -25,6 +32,22 @@ export function bindPetWindowInteractions(
   movementTarget: EventTarget = target
 ): void {
   let dragSession: DragSession | null = null;
+  let leftClickTimer: ReturnType<typeof setTimeout> | null = null;
+  let rightClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearLeftClickTimer(): void {
+    if (leftClickTimer) {
+      clearTimeout(leftClickTimer);
+      leftClickTimer = null;
+    }
+  }
+
+  function clearRightClickTimer(): void {
+    if (rightClickTimer) {
+      clearTimeout(rightClickTimer);
+      rightClickTimer = null;
+    }
+  }
 
   target.addEventListener("mousedown", (event) => {
     const mouseEvent = event as PointerLikeEvent;
@@ -55,10 +78,16 @@ export function bindPetWindowInteractions(
 
     dragSession.dragged = true;
     event.preventDefault();
-    await callbacks.startDragging();
+    callbacks.setDragging?.(true);
+
+    try {
+      await callbacks.startDragging();
+    } finally {
+      callbacks.setDragging?.(false);
+    }
   });
 
-  movementTarget.addEventListener("mouseup", async (event) => {
+  movementTarget.addEventListener("mouseup", (event) => {
     const mouseEvent = event as PointerLikeEvent;
 
     if (!dragSession || mouseEvent.button !== 0) {
@@ -74,14 +103,54 @@ export function bindPetWindowInteractions(
     dragSession = null;
 
     if (shouldToggle) {
-      await callbacks.togglePlayback();
+      clearLeftClickTimer();
+      leftClickTimer = setTimeout(() => {
+        leftClickTimer = null;
+        void callbacks.togglePlayback();
+      }, CLICK_CONFIRM_DELAY_MS);
     }
   });
 
+  target.addEventListener("dblclick", async (event) => {
+    const mouseEvent = event as PointerLikeEvent;
+
+    if (mouseEvent.button !== 0) {
+      return;
+    }
+
+    clearLeftClickTimer();
+    event.preventDefault();
+    event.stopPropagation();
+    await callbacks.playNext?.();
+  });
+
   target.addEventListener("contextmenu", async (event) => {
+    const mouseEvent = event as PointerLikeEvent;
     dragSession = null;
     event.preventDefault();
     event.stopPropagation();
-    await callbacks.closeWindow();
+
+    if (rightClickTimer) {
+      clearRightClickTimer();
+      await callbacks.playPrevious?.();
+      return;
+    }
+
+    rightClickTimer = setTimeout(() => {
+      rightClickTimer = null;
+      void callbacks.openContextMenu?.({
+        x: mouseEvent.clientX ?? 0,
+        y: mouseEvent.clientY ?? 0
+      });
+    }, CLICK_CONFIRM_DELAY_MS);
+  });
+
+  target.addEventListener("wheel", async (event) => {
+    const wheelEvent = event as PointerLikeEvent;
+    const delta = (wheelEvent.deltaY ?? 0) < 0 ? VOLUME_STEP : -VOLUME_STEP;
+
+    event.preventDefault();
+    event.stopPropagation();
+    await callbacks.changeVolume?.(delta);
   });
 }

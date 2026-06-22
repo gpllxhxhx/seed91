@@ -4,6 +4,24 @@
 
 This guide covers local Windows packaging and basic release verification for `apps/desktop-pet`.
 It does not package the backend into the desktop app.
+The formal desktop pet is the Tauri + Vite + TypeScript app in `apps/desktop-pet`.
+The old Electron pet under `desktop/` is retained as reference code only and is not part of the formal desktop startup or packaging flow.
+
+## Formal Desktop Commands
+
+Run these commands from the repository root:
+
+```powershell
+npm run desktop
+npm run desktop:build
+npm run desktop:publish-local
+```
+
+`npm run desktop` starts the formal Tauri desktop pet in development mode.
+`npm run desktop:build` builds the formal Tauri desktop pet from `apps/desktop-pet`.
+`npm run desktop:publish-local` builds the Tauri desktop pet and copies the portable exe into `frontend/downloads/`.
+
+There is no npm launcher for the old Electron desktop pet.
 
 ## Pre-build Checklist
 
@@ -38,7 +56,7 @@ VITE_MUSIC_API_BASE=https://your-domain.example.com
 
 ## Verification Commands
 
-Run these commands from `apps/desktop-pet` in this order:
+Run these commands from `apps/desktop-pet` in this order when you want to verify the Tauri project directly:
 
 ```bash
 npm run test
@@ -51,15 +69,15 @@ Then run this command from `apps/desktop-pet/src-tauri`:
 cargo check
 ```
 
-Finally run the release build from `apps/desktop-pet`:
+Finally run the release build from the repository root:
 
-```bash
-npm run tauri -- build
+```powershell
+npm run desktop:build
 ```
 
 ## Build Output Paths
 
-Current successful Windows exe output:
+Current formal Windows exe output:
 
 ```text
 apps/desktop-pet/src-tauri/target/release/music-pet-desktop.exe
@@ -148,7 +166,7 @@ It does not add auto-update, login, lyrics, search, backend packaging, or instal
 
 ## Web Beta Publish Note
 
-For the website beta download flow, publish the stage-8 Tauri executable as a portable Windows beta exe:
+For the website beta download flow, publish the formal Tauri executable as a portable Windows beta exe:
 
 ```text
 frontend/downloads/desktop-pet-player-v0.1.0-windows.exe
@@ -156,3 +174,9 @@ frontend/downloads/desktop-pet-player-v0.1.0-windows.exe
 
 This file is a portable runnable exe, not an installer.
 Do not label it as `setup.exe` unless a real installer build is introduced later.
+
+## Retired Electron Note
+
+The old Electron pet remains in `desktop/` for reference only.
+Do not use `desktop/` as the formal startup, build, or release source.
+The old Electron npm launchers and Electron builder configuration have been retired.

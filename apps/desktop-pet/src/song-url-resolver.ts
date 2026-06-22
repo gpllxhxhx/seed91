@@ -6,7 +6,13 @@ type FetchLike = (
 type SongUrlResolverOptions = {
   apiBase: string;
   fetchImpl?: FetchLike;
+  timeoutMs?: number;
 };
+
+type SongRequestPath = "/song/url/v1" | "/song/url/match";
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
+const SONG_URL_LEVEL = "exhigh";
 
 function extractErrorDetail(body: unknown): string {
   if (!body) {
@@ -50,15 +56,33 @@ function extractSongUrl(payload: unknown): string {
   }
 
   const responseData = payload as {
+    audio_url?: unknown;
     data?: unknown;
+    proxyUrl?: unknown;
     url?: unknown;
   };
+
+  if (typeof responseData.proxyUrl === "string" && responseData.proxyUrl.trim()) {
+    return responseData.proxyUrl.trim();
+  }
 
   if (typeof responseData.url === "string" && responseData.url.trim()) {
     return responseData.url.trim();
   }
 
+  if (typeof responseData.audio_url === "string" && responseData.audio_url.trim()) {
+    return responseData.audio_url.trim();
+  }
+
+  if (typeof responseData.data === "string" && responseData.data.trim()) {
+    return responseData.data.trim();
+  }
+
   if (!Array.isArray(responseData.data) || responseData.data.length === 0) {
+    if (responseData.data && typeof responseData.data === "object") {
+      return extractSongUrl(responseData.data);
+    }
+
     return "";
   }
 
@@ -84,29 +108,66 @@ function extractSongUrl(payload: unknown): string {
   return "";
 }
 
+function normalizeResolvedSongUrl(songUrl: string, apiBase: string): string {
+  try {
+    return new URL(songUrl, `${apiBase}/`).toString();
+  } catch {
+    return songUrl;
+  }
+}
+
 export function createSongUrlResolver(options: SongUrlResolverOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const apiBase = options.apiBase.trim().replace(/\/+$/, "");
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
 
-  return async (songId: string | number): Promise<string> => {
+  async function requestSongPayload(
+    path: SongRequestPath,
+    songId: string | number,
+    unblock: boolean
+  ): Promise<unknown> {
     if (!apiBase) {
       throw new Error("请求失败：未配置 VITE_MUSIC_API_BASE");
     }
 
-    const requestUrl = new URL("/song/url/v1", `${apiBase}/`);
+    const requestUrl = new URL(path, `${apiBase}/`);
     requestUrl.searchParams.set("id", String(songId));
-    requestUrl.searchParams.set("level", "exhigh");
-    requestUrl.searchParams.set("unblock", "true");
+    requestUrl.searchParams.set("level", SONG_URL_LEVEL);
+
+    if (unblock) {
+      requestUrl.searchParams.set("unblock", "true");
+    }
 
     let response: Response;
 
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
     try {
-      response = await fetchImpl(requestUrl.toString(), {
-        cache: "no-store",
-        method: "GET"
-      });
-    } catch {
+      response = await Promise.race([
+        fetchImpl(requestUrl.toString(), {
+          cache: "no-store",
+          method: "GET"
+        }),
+        new Promise<Response>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new Error("请求超时：后端响应过慢"));
+          }, timeoutMs);
+        })
+      ]);
+    } catch (error) {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+
+      if (error instanceof Error && error.message.includes("请求超时")) {
+        throw error;
+      }
+
       throw new Error(`请求失败：无法连接后端或被跨域策略拦截 (${apiBase})`);
+    }
+
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
     }
 
     const body = await readResponseBody(response);
@@ -120,12 +181,36 @@ export function createSongUrlResolver(options: SongUrlResolverOptions) {
       );
     }
 
-    const songUrl = extractSongUrl(body);
+    return body;
+  }
 
-    if (!songUrl) {
-      throw new Error("后端未返回歌曲 URL");
+  return async (songId: string | number): Promise<string> => {
+    let lastError: Error | null = null;
+
+    const requestPlan: Array<{ path: SongRequestPath; unblock: boolean }> = [
+      { path: "/song/url/v1", unblock: true },
+      { path: "/song/url/match", unblock: false },
+      { path: "/song/url/v1", unblock: false }
+    ];
+
+    for (const request of requestPlan) {
+      try {
+        const body = await requestSongPayload(request.path, songId, request.unblock);
+        const songUrl = extractSongUrl(body);
+
+        if (songUrl) {
+          return normalizeResolvedSongUrl(songUrl, apiBase);
+        }
+
+        lastError = new Error("后端未返回歌曲 URL");
+      } catch (error) {
+        lastError =
+          error instanceof Error
+            ? error
+            : new Error(String(error || "后端未返回歌曲 URL"));
+      }
     }
 
-    return songUrl;
+    throw lastError ?? new Error("后端未返回歌曲 URL");
   };
 }

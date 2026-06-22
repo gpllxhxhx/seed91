@@ -41,6 +41,9 @@ class LyricWindow {
 
     this.window.setAlwaysOnTop(true, 'screen-saver');
     this.setLocked(Boolean(lyricConfig.locked));
+    this.window.once('ready-to-show', () => {
+      this.logger?.info('lyric window ready');
+    });
     this.window.on('moved', () => this.savePosition());
     this.window.on('close', (event) => {
       if (!this.app.isQuitting) {
@@ -51,8 +54,13 @@ class LyricWindow {
     this.window.on('closed', () => {
       this.window = null;
     });
+    this.window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      this.logger?.error('lyric window failed to load resources', { errorCode, errorDescription, validatedURL });
+    });
 
-    this.window.loadFile(path.join(this.app.getAppPath(), 'desktop', 'renderer', 'lyric', 'LyricOverlay.html'));
+    this.window.loadFile(path.join(this.app.getAppPath(), 'desktop', 'renderer', 'lyric', 'LyricOverlay.html')).catch((error) => {
+      this.logger?.error('lyric window loadFile failed', { error: error?.stack || error?.message || String(error) });
+    });
     return this.window;
   }
 

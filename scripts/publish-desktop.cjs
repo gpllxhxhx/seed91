@@ -12,7 +12,7 @@ const publishedFileName = 'desktop-pet-player-v0.1.0-windows.exe';
 function getReleaseExecutable() {
   if (!fs.existsSync(tauriReleaseExe)) {
     throw new Error(
-      'Tauri release executable does not exist. Run npm run tauri -- build in apps/desktop-pet first.'
+      'Tauri release executable does not exist. Run npm run desktop:build from the repository root first.'
     );
   }
 
@@ -28,6 +28,14 @@ function sha256(filePath) {
   return hash.digest('hex');
 }
 
+function getLocalReleaseDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 const executable = getReleaseExecutable();
 fs.mkdirSync(downloadsDir, { recursive: true });
 
@@ -41,7 +49,7 @@ const metadata = {
   portable: true,
   file: executable.file,
   sha256: sha256(targetPath),
-  releaseDate: new Date().toISOString().slice(0, 10),
+  releaseDate: getLocalReleaseDate(),
   notes: [
     '桌宠音乐播放器 Windows 内测版',
     '支持导入歌单与歌曲播放',

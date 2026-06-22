@@ -71,3 +71,38 @@ test('API.getStreamUrl keeps the /api prefix for same-origin playback URLs', () 
 
   assert.match(streamUrl, /^http:\/\/127\.0\.0\.1:8000\/api\/song\/url\/v1\?/);
 });
+
+test('API.importPlaylist rejects empty remote playlists with a user-friendly message', async () => {
+  const { API } = loadApi({
+    context: {
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get(name) {
+            return name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null;
+          },
+        },
+        async json() {
+          return {
+            playlist: {
+              id: 2468,
+              name: 'Empty List',
+              trackCount: 0,
+              tracks: [],
+            },
+          };
+        },
+        async text() {
+          return '{"playlist":{"id":2468,"name":"Empty List","trackCount":0,"tracks":[]}}';
+        },
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => API.importPlaylist('2468'),
+    /歌单内容为空/
+  );
+});

@@ -15,9 +15,15 @@ export type PlaybackStateSnapshot = {
   currentSongIndex: number;
 };
 
+export type PlaybackErrorSnapshot = {
+  message: string;
+  song: PlaybackSong | null;
+};
+
 type PlaybackRefs = {
   stage: {
     dataset: {
+      animation?: string;
       playbackState?: string;
     };
   };
@@ -34,19 +40,23 @@ type PlaybackControllerOptions = {
   resolveSongUrl: (songId: string | number) => Promise<string>;
   initialSong?: PlaybackSong;
   onStateChange?: (snapshot: PlaybackStateSnapshot) => void;
+  onPlaybackError?: (snapshot: PlaybackErrorSnapshot) => void;
 };
 
 function setPaused(refs: PlaybackRefs): void {
+  refs.stage.dataset.animation = "paused";
   refs.stage.dataset.playbackState = "paused";
   refs.status.textContent = "已暂停";
 }
 
 function setLoading(refs: PlaybackRefs): void {
+  refs.stage.dataset.animation = "loading";
   refs.stage.dataset.playbackState = "loading";
   refs.status.textContent = "正在请求歌曲";
 }
 
 function setPlaying(refs: PlaybackRefs): void {
+  refs.stage.dataset.animation = "playing";
   refs.stage.dataset.playbackState = "playing";
   refs.status.textContent = "播放中";
 }
@@ -57,6 +67,7 @@ function clearError(refs: PlaybackRefs): void {
 }
 
 function showError(refs: PlaybackRefs, message: string): void {
+  refs.stage.dataset.animation = "error";
   refs.error.textContent = message;
   refs.error.hidden = false;
 }
@@ -90,10 +101,17 @@ export function createPlaybackController(
   let pendingSongUrl: Promise<string> | null = null;
   let pendingSongId = "";
   let isToggling = false;
+  let playbackRequestVersion = 0;
   const emitStateChange = () => {
     options.onStateChange?.({
       currentSong,
       currentSongIndex
+    });
+  };
+  const emitPlaybackError = (message: string) => {
+    options.onPlaybackError?.({
+      message,
+      song: currentSong
     });
   };
 
@@ -127,7 +145,9 @@ export function createPlaybackController(
 
   audio.addEventListener("error", () => {
     setPaused(refs);
-    showError(refs, "播放失败：当前歌曲 URL 无法播放");
+    const message = "播放失败：当前歌曲 URL 无法播放";
+    showError(refs, message);
+    emitPlaybackError(message);
   });
 
   function getCurrentSongId(): string {
@@ -180,8 +200,20 @@ export function createPlaybackController(
     return pendingSongUrl;
   }
 
-  async function startPlaybackForCurrentSong(): Promise<void> {
+  function isLatestPlaybackRequest(requestVersion: number): boolean {
+    return requestVersion === playbackRequestVersion;
+  }
+
+  async function startPlaybackForCurrentSong(requestVersion: number): Promise<boolean> {
+    const requestedSongId = getCurrentSongId();
     const songUrl = await ensureSongUrl();
+
+    if (
+      !isLatestPlaybackRequest(requestVersion) ||
+      requestedSongId !== getCurrentSongId()
+    ) {
+      return false;
+    }
 
     if (audio.src !== songUrl) {
       audio.src = songUrl;
@@ -189,6 +221,7 @@ export function createPlaybackController(
 
     try {
       await audio.play();
+      return true;
     } catch (error) {
       throw new Error(
         `播放失败：${getErrorMessage(error, "无法播放当前歌曲")}`
@@ -225,7 +258,23 @@ export function createPlaybackController(
     getCurrentSong(): PlaybackSong | null {
       return currentSong;
     },
-    async playSong(song: PlaybackSong): Promise<void> {
+    clearPlayback(): void {
+      playlistSongs = [];
+      currentSong = null;
+      currentSongIndex = -1;
+      pendingSongUrl = null;
+      pendingSongId = "";
+      playbackRequestVersion += 1;
+
+      if (!audio.paused) {
+        audio.pause();
+      }
+
+      clearError(refs);
+      setPaused(refs);
+      emitStateChange();
+    },
+    async playSong(song: PlaybackSong): Promise<boolean> {
       currentSong = song;
       currentSongIndex = playlistSongs.findIndex(
         (item) => String(item.id) === String(song.id)
@@ -237,84 +286,101 @@ export function createPlaybackController(
       }
 
       isToggling = true;
+      const requestVersion = playbackRequestVersion + 1;
+      playbackRequestVersion = requestVersion;
       clearError(refs);
 
       try {
-        await startPlaybackForCurrentSong();
+        return await startPlaybackForCurrentSong(requestVersion);
       } catch (error) {
-        setPaused(refs);
-        showError(refs, getErrorMessage(error, "播放失败：无法播放当前歌曲"));
+        if (isLatestPlaybackRequest(requestVersion)) {
+          const message = getErrorMessage(error, "播放失败：无法播放当前歌曲");
+          setPaused(refs);
+          showError(refs, message);
+          emitPlaybackError(message);
+        }
+
+        return false;
       } finally {
-        isToggling = false;
+        if (isLatestPlaybackRequest(requestVersion)) {
+          isToggling = false;
+        }
       }
     },
-    async playSongAtIndex(index: number): Promise<void> {
+    async playSongAtIndex(index: number): Promise<boolean> {
       if (!Number.isInteger(index) || index < 0 || index >= playlistSongs.length) {
         showError(refs, "请先导入歌单");
-        return;
+        return false;
       }
 
       currentSongIndex = index;
-      await controller.playSong(playlistSongs[index]);
+      return controller.playSong(playlistSongs[index]);
     },
-    async playNext(): Promise<void> {
+    async playNext(): Promise<boolean> {
       if (playlistSongs.length === 0) {
         showError(refs, "请先导入歌单");
-        return;
+        return false;
       }
 
       if (currentSongIndex < 0) {
-        await controller.playSongAtIndex(0);
-        return;
+        return controller.playSongAtIndex(0);
       }
 
       if (currentSongIndex >= playlistSongs.length - 1) {
         showError(refs, "已经是最后一首");
-        return;
+        return false;
       }
 
-      await controller.playSongAtIndex(currentSongIndex + 1);
+      return controller.playSongAtIndex(currentSongIndex + 1);
     },
-    async playPrevious(): Promise<void> {
+    async playPrevious(): Promise<boolean> {
       if (playlistSongs.length === 0) {
         showError(refs, "请先导入歌单");
-        return;
+        return false;
       }
 
       if (currentSongIndex < 0) {
-        await controller.playSongAtIndex(0);
-        return;
+        return controller.playSongAtIndex(0);
       }
 
       if (currentSongIndex === 0) {
         showError(refs, "已经是第一首");
-        return;
+        return false;
       }
 
-      await controller.playSongAtIndex(currentSongIndex - 1);
+      return controller.playSongAtIndex(currentSongIndex - 1);
     },
-    async togglePlayback(): Promise<void> {
+    async togglePlayback(): Promise<boolean> {
       if (isToggling) {
-        return;
+        return false;
       }
 
       if (audio.paused) {
         isToggling = true;
+        const requestVersion = playbackRequestVersion + 1;
+        playbackRequestVersion = requestVersion;
         clearError(refs);
 
         try {
-          await startPlaybackForCurrentSong();
+          return await startPlaybackForCurrentSong(requestVersion);
         } catch (error) {
-          setPaused(refs);
-          showError(refs, getErrorMessage(error, "播放失败：无法播放当前歌曲"));
-        } finally {
-          isToggling = false;
-        }
+          if (isLatestPlaybackRequest(requestVersion)) {
+            const message = getErrorMessage(error, "播放失败：无法播放当前歌曲");
+            setPaused(refs);
+            showError(refs, message);
+            emitPlaybackError(message);
+          }
 
-        return;
+          return false;
+        } finally {
+          if (isLatestPlaybackRequest(requestVersion)) {
+            isToggling = false;
+          }
+        }
       }
 
       audio.pause();
+      return true;
     }
   };
 
